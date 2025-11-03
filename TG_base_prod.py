@@ -6,6 +6,7 @@
 250211      ADD MINIMUM PRICE VARIATION TO TRIGGER MOVMENT ALARM (sa a commo  low movment do not trigger alarm....)
 250904      modify streaming_STK_OPT_TRADE from 4 cols to 6 ---> added bid_size and ask_size as col 5 and 6
 251103      ADD process to input in .txt file the desired xDTE option contract
+            Removed a legacy variable blocking propoer option list creation
 
 '''
 
