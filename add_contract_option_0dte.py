@@ -29,8 +29,14 @@ class OptionSpec:
     target_delta: float
 
 
-def _build_option_contract(symbol: str, expiry: str, strike: float, right: str) -> Contract:
-    """Create a SMART-routed US option contract."""
+def _build_option_contract(
+    symbol: str,
+    expiry: str,
+    strike: float,
+    right: str,
+    trading_class: Optional[str] = None,
+) -> Contract:
+    """Create a US option contract with sensible defaults."""
     contract = Contract()
     contract.symbol = symbol
     contract.secType = "OPT"
@@ -39,10 +45,11 @@ def _build_option_contract(symbol: str, expiry: str, strike: float, right: str) 
     contract.lastTradeDateOrContractMonth = expiry
     contract.strike = float(strike)
     contract.right = right
-    # SPX index options use a different multiplier and exchange
-    if symbol.upper() == "SPX":
-        contract.exchange = "CBOE"
     contract.multiplier = "100"
+    if trading_class:
+        contract.tradingClass = trading_class
+    if symbol.upper() == "SPX":
+        contract.primaryExchange = "CBOE"
     return contract
 
 
@@ -75,6 +82,7 @@ def add_0dte_option_contracts(
     tz: str = "US/Eastern",
     strike_step: float = 1.0,
     otm_offset: float = 5.0,
+    trading_class: Optional[str] = None,
     price_timeout: float = 10.0,
     price_poll_interval: float = 0.5,
 ) -> List[dict]:
@@ -143,9 +151,17 @@ def add_0dte_option_contracts(
             "Increase TRADE_nbMAX_slots or release unused option slots."
         )
 
+    trading_class_value = trading_class or ("SPXW" if underlying.upper() == "SPX" else underlying)
+
     metadata: List[dict] = []
     for spec, row_index in zip(specs, free_rows):
-        contract = _build_option_contract(underlying, expiry_str, spec.strike, spec.right)
+        contract = _build_option_contract(
+            underlying,
+            expiry_str,
+            spec.strike,
+            spec.right,
+            trading_class=trading_class_value,
+        )
 
         logger.info(
             "Associating {label} ({right}) strike {strike} exp {expiry} to reqId={req}",
@@ -170,6 +186,7 @@ def add_0dte_option_contracts(
                 "right": spec.right,
                 "expiry": expiry_str,
                 "target_delta": spec.target_delta,
+                "tradingClass": trading_class_value,
                 "contract": contract,
             }
         )

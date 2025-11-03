@@ -1615,6 +1615,7 @@ fcn_DataStreaming_start_STK_All()
 UNDERLYING_0DTE_SYMBOL = "SPY"  # switch to "SPX" or another symbol if desired
 UNDERLYING_0DTE_STRIKE_STEP = 1.0  # adjust for instruments with different strike increments
 UNDERLYING_0DTE_OTM_OFFSET = 5.0   # proxy distance from ATM (~0.25 delta)
+UNDERLYING_0DTE_TRADING_CLASS = None  # e.g. "SPXW" for SPX weeklys
 
 try:
     option_metadata_0dte = add_0dte_option_contracts(
@@ -1624,6 +1625,7 @@ try:
         underlying=UNDERLYING_0DTE_SYMBOL,
         strike_step=UNDERLYING_0DTE_STRIKE_STEP,
         otm_offset=UNDERLYING_0DTE_OTM_OFFSET,
+        trading_class=UNDERLYING_0DTE_TRADING_CLASS,
     )
     logger.info("{} 0DTE contracts attached: {}", UNDERLYING_0DTE_SYMBOL, option_metadata_0dte)
     fcn_DataStreaming_start_0DTE_options(option_metadata_0dte, generic_tick_list="106")
@@ -1643,6 +1645,8 @@ time.sleep(3)
 #check all sSTK with non zero values ---. ther are updating!!! We want to save them at the end of the day
 data_2save_STK_list = []
 data_2save_STK_list_idx = []
+data_2save_OPT_list = []
+data_2save_OPT_list_idx = []
 
 for i in range(0,len(stock_symbols_list)):
 
@@ -1653,12 +1657,35 @@ for i in range(0,len(stock_symbols_list)):
         # Add ticker index to know the proper row to query in the futur
         data_2save_STK_list_idx.append(i)
 
+for j in range(streaming_STK_nb, streaming_STK_nb + streaming_OPT_nb + TRADE_nbMAX_slots):
+    meta = streaming_instrument_metadata[j]
+    if meta is None:
+        continue
+    if meta.get("type", "").startswith("OPT"):
+        if (streaming_STK_OPT_TRADE[j,0] != 0 and streaming_STK_OPT_TRADE[j,1] != 0):
+            strike = meta.get("strike")
+            try:
+                strike_str = f"{float(strike):.2f}" if strike is not None else "NA"
+            except (TypeError, ValueError):
+                strike_str = str(strike)
+            opt_label = f"OPT_{meta.get("right", "U")}_{meta.get("symbol", "UNK")}_{strike_str}"
+            data_2save_OPT_list.append(opt_label)
+            data_2save_OPT_list_idx.append(j)
+        data_2save_STK_list.append(stock_symbols_list[i])
+        # Add ticker index to know the proper row to query in the futur
+        data_2save_STK_list_idx.append(i)
+
 logger.info(' ')
 logger.info('data_2save_STK_list')
 logger.info(data_2save_STK_list)
 logger.info(' ')
 logger.info('data_2save_STK_list_idx')
 logger.info(data_2save_STK_list_idx)
+logger.info('data_2save_OPT_list')
+logger.info(data_2save_OPT_list)
+logger.info('data_2save_OPT_list_idx')
+logger.info(data_2save_OPT_list_idx)
+
 
 
 
