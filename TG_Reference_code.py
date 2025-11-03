@@ -53,6 +53,8 @@ import io
 
 from loguru import logger
 
+from add_contract_option_0dte import add_0dte_option_contracts
+
 logger.remove()
 # logger.add("TG_main_app.log", rotation="1024 KB")
 # logger.add("TG_main_app.log", rotation="1024 KB", level="DEBUG", backtrace=True, diagnose=True)
@@ -115,6 +117,11 @@ def contractCreate(symbolEntered):
         contract1.currency = "USD"  # Currency is US dollars
         # In the API side, NASDAQ is always defined as ISLAND in the exchange field
         contract1.exchange = "ISLAND"
+
+    if symbolEntered == 'SPX':
+        contract1.secType = "IND"
+        contract1.currency = "USD"
+        contract1.exchange = "CBOE"
 
     if symbolEntered == 'VIX' or symbolEntered == 'VIX9D' or symbolEntered == 'VIX3M':
         contract1.secType = "FUT"   # Defines the security type as stock
@@ -1533,6 +1540,25 @@ os.chdir('/home/manu/Documents/2009___GENESIS/IB/TG/TG_base/data')
 #     STREAMING : ALL STOCKS
 # #################################
 fcn_DataStreaming_start_STK_All()
+
+# Seed 0DTE option streaming (ATM/OTM Calls & Puts) for the chosen underlying
+UNDERLYING_0DTE_SYMBOL = "SPY"  # switch to "SPX" or another symbol if desired
+UNDERLYING_0DTE_STRIKE_STEP = 1.0  # adjust for instruments with different strike increments
+UNDERLYING_0DTE_OTM_OFFSET = 5.0   # proxy distance from ATM (~0.25 delta)
+
+try:
+    option_metadata_0dte = add_0dte_option_contracts(
+        app=app,
+        streaming_table=streaming_STK_OPT_TRADE,
+        stock_symbols=stock_symbols_list,
+        option_contract_dates=option_contractDate_list,
+        underlying=UNDERLYING_0DTE_SYMBOL,
+        strike_step=UNDERLYING_0DTE_STRIKE_STEP,
+        otm_offset=UNDERLYING_0DTE_OTM_OFFSET,
+    )
+    logger.info("{} 0DTE contracts attached: {}", UNDERLYING_0DTE_SYMBOL, option_metadata_0dte)
+except Exception as exc:
+    logger.error("Failed to seed {} 0DTE contracts: {}", UNDERLYING_0DTE_SYMBOL, exc)
 
 # !!! Check all available stock infos and fill data_2save with the first iteration data
 time.sleep(3)
