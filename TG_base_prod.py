@@ -28,29 +28,22 @@ import pandas as pd
 import numpy as np
 import os
 import pytz
-# import shutil
 import requests
-
-# import yfinance as yf
 import sys
-
-# import json
 from dotenv import load_dotenv
-# import io
-
 from loguru import logger
 
 from add_contract_option import load_option_requests, prepare_option_contracts
 
 
 logger.remove()
-# logger.add("TG_main_app.log", rotation="1024 KB")
-# logger.add("TG_main_app.log", rotation="1024 KB", level="DEBUG", backtrace=True, diagnose=True)
-# logger.add("/home/manu/Documents/2009___GENESIS/IB/TG/TG_240508_base/TG_main_app.log", rotation="1024 KB", level="DEBUG", backtrace=True, diagnose=True)
-logger.add("/Users/manu/Documents/code/TG_project/TG_base/TG_main_app.log", rotation="1024 KB", level="DEBUG", backtrace=True, diagnose=True)
-logger.add(sys.stdout, colorize=True, format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
-
-# logger.add(sys.stderr, level="ERROR") # Add a sink for console errors
+logger.add("/Users/manu/Documents/code/TG_project/TG_base/TG_main_app.log",
+           rotation="1024 KB", level="DEBUG", backtrace=True, diagnose=True)
+logger.add(sys.stdout, colorize=True,
+           format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+                  "<level>{level: <8}</level> | "
+                  "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+                  "<level>{message}</level>")
 logger.add(sys.stderr, format="{time:MMMM D, YYYY > HH:mm:ss} | {level} | {message} | {extra}")
 
 load_dotenv()
@@ -66,14 +59,23 @@ CashBalance_USD = 0.0
 Account_NetLiquidation_CAD = 0.0
 positionsDict = {}
 
-# Option data
+# Option data (legacy support for old option search routines)
 OptionData = []
 
-# Below are the custom classes and methods
+
+def option_entry_underlying(entry: str) -> str:
+    if entry.startswith("OPT_"):
+        parts = entry.split("_")
+        if len(parts) >= 2:
+            return parts[1]
+    return entry
 
 
-
-# Below are the custom classes and methods
+def ensure_option_contract_date(index: int, value: str):
+    global option_contractDate_list
+    while len(option_contractDate_list) <= index:
+        option_contractDate_list.append("")
+    option_contractDate_list[index] = value
 
 
 def contractCreate(symbolEntered):
@@ -111,6 +113,11 @@ def contractCreate(symbolEntered):
         contract1.currency = "USD"  # Currency is US dollars
         contract1.exchange = "CBOE"
         # contract1.PrimaryExch = "CBOE"
+
+    if symbolEntered == 'SPX':
+        contract1.secType = "IND"
+        contract1.currency = "USD"
+        contract1.exchange = "CBOE"
 
     return contract1    # Returns the contract object
 
@@ -891,8 +898,7 @@ def fcn_DataStreaming_start_OPT(_stock, _OPT_exp_nbDays, _reqId):
 
     # Fill strike price in streaming_100_OPT array (col# 0)
     streaming_STK_OPT_TRADE[_reqId,0] = OPT_Strike
-    # Fill option_contractDate_list with option contract date
-    option_contractDate_list[_reqId-streaming_STK_nb] = OPT_ContractDate
+    ensure_option_contract_date(_reqId - streaming_STK_nb, OPT_ContractDate)
 
     streaming_instrument_metadata[_reqId] = {
         "type": "OPT",
@@ -1008,7 +1014,7 @@ def fcn_DataStreaming_start_OPT_update_All(): # start streamin ALL OPTIONS from 
             # stockSymbol is in CurrentOptionInfos_df ---> do a price update with specific strike price
             print('[ok] option symbol found in CurrentOptionInfos_df -----> STREAMING with a specific Strike and contractDate on OPT_',_stock)
             fcn_DataStreaming_start_OPT_fullInfos(_stock, _strike, _contractDate, i+streaming_STK_nb)
-            option_contractDate_list[stock__index] = _contractDate
+            ensure_option_contract_date(stock__index, _contractDate)
         except:
             print('[warning] option symbol NOT found in CurrentOptionInfos_df -----> STREAMING with NEW Strike and NEW contractDate on OPT_',_stock)
             fcn_DataStreaming_start_OPT(_stock, opt_expDelay_nDays, i+streaming_STK_nb)
@@ -1512,32 +1518,13 @@ flag_vol_consecutive_same = True # use to track if in two consecutives proce upd
 
 # Load stock list and option list to track in IB streaming process
 
-# with open('/home/manu/Documents/2009___GENESIS/IB/Code/GEN_STK_HistoryList_500_210223.txt') as fp:
-# with open('/home/manu/Documents/2009___GENESIS/IB/Code/GEN_STK_HistoryList_500_201229.txt') as fp:
-# with open('/home/manu/Documents/2009___GENESIS/IB/TG/TG_240508_base/GEN_IB_STK_list.txt') as fp:
-with open('/Users/manu/Documents/code/TG_project/TG_base/GEN_IB_STK_list.txt') as fp:
-    stock_symbols_list = fp.read().split("\n")
-    del stock_symbols_list[-1] #remove blank space at the end....
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+with open(os.path.join(BASE_DIR, 'GEN_IB_STK_list.txt')) as fp:
+    stock_symbols_list = [line.strip() for line in fp if line.strip()]
 
-
-
-STK_bloc_id = 0
-
-# stock_symbols_list  = stock_symbols_FULL_list[(STK_bloc_id)*STK_bloc_load_nb:(STK_bloc_id+1)*STK_bloc_load_nb]  # init with just first 50 STK from 500 full list
-
-
-# stock_symbols_list_strConv = ','.join(stock_symbols_list)
-# stock_symbols_FULL_list_strConv = ','.join(stock_symbols_FULL_list)
-
-# Create a log file for real time messaging tracking
-# ToDo....
-
-
-
-with open('/Users/manu/Documents/code/TG_project/TG_base/GEN_IB_OPT_list.txt') as fp:
-    option_symbols_list = fp.read().split("\n")
-    del option_symbols_list[-1] #remove blank space at the end....
+with open(os.path.join(BASE_DIR, 'GEN_IB_OPT_list.txt')) as fp:
+    option_symbols_list = [line.strip() for line in fp if line.strip()]
 
 streaming_STK_nb = len(stock_symbols_list) # number of stock we follow using market data
 streaming_OPT_nb = len(option_symbols_list) # number of option we follow using market data (using same sequence as stock listing... si if follow = 10, il will follow option prices of the first 10 stocks as shown in the ticker listing...)
@@ -1545,23 +1532,13 @@ streaming_TRADE_first_index =  streaming_STK_nb + streaming_OPT_nb
 
 ATR_STK_vect = np.zeros((streaming_STK_nb+streaming_OPT_nb,1))
 
-#stocks_df = pd.read_pickle('GENESIS_createTickerList_201109_Final_df.pkl')
-#stock_symbols_list = list(stocks_df['symbol'])
-#stock_symbols_list.insert(0, 'TICKER')  # add a TICKER header at first position
 streaming_STK_OPT_TRADE = np.zeros((streaming_STK_nb+streaming_OPT_nb+TRADE_nbMAX_slots,6))
 streaming_instrument_metadata = [None] * (streaming_STK_nb + streaming_OPT_nb + TRADE_nbMAX_slots)
-# STK_vol_matrix = np.zeros((streaming_STK_nb,2))
-# STK_vol_matrix_update = np.zeros((streaming_STK_nb,2))
 daily_full_data_slices = []
 daily_full_data_slices_unixtime = []
 daily_full_data_slices_str_time = []
 
-# bid_price_list = []
-# ask_price_list = []
-# bid_size_list = []
-# ask_size_list = []
-
-option_contractDate_list = option_symbols_list.copy() #use to store the option contract date expiration
+option_contractDate_list = []
 streaming_STK_OPT_currentPrices_vect = np.zeros((streaming_STK_nb+streaming_OPT_nb,1)) # all STK prices vector (options contract prices, if streameing... being the underlying STK proce...)
 
 TimeStamp_Start_PROCESS_DATA_UPDATE = time.time()   #Time to track the main price update process
@@ -1699,12 +1676,14 @@ for j in range(streaming_STK_nb, streaming_STK_nb + streaming_OPT_nb + TRADE_nbM
         continue
     if meta.get("type", "").startswith("OPT"):
         if streaming_STK_OPT_TRADE[j,0] != 0 and streaming_STK_OPT_TRADE[j,1] != 0:
-            strike = meta.get("strike")
-            try:
-                strike_str = f"{float(strike):.2f}" if strike is not None else "NA"
-            except (TypeError, ValueError):
-                strike_str = str(strike)
-            opt_label = f"OPT_{meta.get('right', 'U')}_{meta.get('symbol', 'UNK')}_{strike_str}"
+            opt_label = meta.get("label")
+            if not opt_label:
+                strike = meta.get("strike")
+                try:
+                    strike_str = f"{float(strike):.2f}" if strike is not None else "NA"
+                except (TypeError, ValueError):
+                    strike_str = str(strike)
+                opt_label = f"OPT_{meta.get('right', 'U')}_{meta.get('symbol', 'UNK')}_{strike_str}"
             data_2save_OPT_list.append(opt_label)
             data_2save_OPT_list_idx.append(j)
 

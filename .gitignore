@@ -1,0 +1,8 @@
+*.csv
+*.npz
+*.parquet
+*.pkl
+*.log
+**/data
+*.DS_Store
+*.pyc
