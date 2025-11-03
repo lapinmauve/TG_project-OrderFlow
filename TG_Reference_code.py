@@ -5,6 +5,7 @@
 250206      ADD THE COMPLETE STOCKS DETAILS WHEN PRICE MOVMENT ALARM IS TRIGGERED
 250211      ADD MINIMUM PRICE VARIATION TO TRIGGER MOVMENT ALARM (sa a commo  low movment do not trigger alarm....)
 250904      modify streaming_STK_OPT_TRADE from 4 cols to 6 ---> added bid_size and ask_size as col 5 and 6
+251103      ADD process to input in .txt file the desired xDTE option contract
 
 '''
 
@@ -39,7 +40,7 @@ from dotenv import load_dotenv
 
 from loguru import logger
 
-from add_contract_option_0dte import load_option_requests, prepare_option_contracts
+from add_contract_option_0dte import add_0dte_option_contracts
 
 
 logger.remove()
@@ -73,21 +74,6 @@ OptionData = []
 
 
 # Below are the custom classes and methods
-
-
-def option_entry_underlying(entry: str) -> str:
-    if entry.startswith('OPT_'):
-        parts = entry.split('_')
-        if len(parts) >= 2:
-            return parts[1]
-    return entry
-
-
-def ensure_option_contract_date(index: int, value: str):
-    global option_contractDate_list
-    while len(option_contractDate_list) <= index:
-        option_contractDate_list.append("")
-    option_contractDate_list[index] = value
 
 
 def contractCreate(symbolEntered):
@@ -905,7 +891,7 @@ def fcn_DataStreaming_start_OPT(_stock, _OPT_exp_nbDays, _reqId):
     # Fill strike price in streaming_100_OPT array (col# 0)
     streaming_STK_OPT_TRADE[_reqId,0] = OPT_Strike
     # Fill option_contractDate_list with option contract date
-    ensure_option_contract_date(_reqId - streaming_STK_nb, OPT_ContractDate)
+    option_contractDate_list[_reqId-streaming_STK_nb] = OPT_ContractDate
 
     streaming_instrument_metadata[_reqId] = {
         "type": "OPT",
@@ -915,7 +901,6 @@ def fcn_DataStreaming_start_OPT(_stock, _OPT_exp_nbDays, _reqId):
         "expiry": OPT_ContractDate,
         "right": "P",
         "contract": contractOption_FULL,
-        "label": f"OPT_{_stock}_{OPT_Strike}",
     }
 
     return 1
@@ -949,7 +934,6 @@ def fcn_DataStreaming_start_OPT_fullInfos(_stock, _strike, _contractDate, _reqId
         "expiry": _contractDate,
         "right": "P",
         "contract": contractOption_FULL,
-        "label": f"OPT_{_stock}_{_strike}",
     }
 
     return 1
@@ -966,7 +950,7 @@ def fcn_DataStreaming_start_OPT_SetStrike_All(): # start streamin ALL OPTIONS fr
     for i in range(0,len(option_symbols_list)): #process all options symbols in list
 
 
-        _stock = option_entry_underlying(option_symbols_list[i])
+        _stock = option_symbols_list[i][4:]  # Get underlying stock name ---> removing the 'OPT_' prefix...
 #        #get option underliying stock index in streaming_STK_OPT_TRADE array
 #        try:
 #            stock__index = stock_symbols_list.index(_stock)
@@ -996,7 +980,7 @@ def fcn_DataStreaming_start_OPT_update_All(): # start streamin ALL OPTIONS from 
     for i in range(0,len(option_symbols_list)): #process all options symbols in list
 
 
-        _stock = option_entry_underlying(option_symbols_list[i])
+        _stock = option_symbols_list[i][4:]  # Get underlying stock name ---> removing the 'OPT_' prefix...
         #check if we have curent symbol in CurrentOptionInfos_df
         try:
             stock__index = list(CurrentOptionInfos_df['stockSymbol']).index('OPT_'+_stock)
@@ -1005,7 +989,7 @@ def fcn_DataStreaming_start_OPT_update_All(): # start streamin ALL OPTIONS from 
             # stockSymbol is in CurrentOptionInfos_df ---> do a price update with specific strike price
             print('[ok] option symbol found in CurrentOptionInfos_df -----> STREAMING with a specific Strike and contractDate on OPT_',_stock)
             fcn_DataStreaming_start_OPT_fullInfos(_stock, _strike, _contractDate, i+streaming_STK_nb)
-            ensure_option_contract_date(stock__index, _contractDate)
+            option_contractDate_list[stock__index] = _contractDate
         except:
             print('[warning] option symbol NOT found in CurrentOptionInfos_df -----> STREAMING with NEW Strike and NEW contractDate on OPT_',_stock)
             fcn_DataStreaming_start_OPT(_stock, opt_expDelay_nDays, i+streaming_STK_nb)
@@ -1063,7 +1047,6 @@ def fcn_DataStreaming_start_OPT_TRADE(_stock, _OPT_exp_nbDays, TRADE_slot_nb):
         "expiry": OPT_ContractDate,
         "right": "P",
         "contract": contractOption_FULL,
-        "label": f"OPTTRADE_{_stock}_{OPT_Strike}",
     }
 
 
@@ -1088,14 +1071,13 @@ def fcn_DataStreaming_start_0DTE_options(option_metadata, generic_tick_list="106
 
         app.reqMktData(req_id, contract, generic_tick_list, False, False, [])
         streaming_instrument_metadata[req_id] = {
-            "type": entry.get("type", "OPT_CFG"),
+            "type": "OPT_0DTE",
             "symbol": contract.symbol,
             "reqId": req_id,
             "strike": entry.get("strike"),
             "expiry": entry.get("expiry"),
             "right": entry.get("right"),
             "contract": contract,
-            "label": entry.get("label"),
         }
         logger.info(
             "Started streaming for {} (reqId={}, strike={}, right={}, expiry={})",
@@ -1198,7 +1180,7 @@ def fcn_update_STK_OPT_vect():
     streaming_STK_OPT_currentPrices_vect[:streaming_STK_nb,0] = streaming_STK_OPT_TRADE[:streaming_STK_nb,0]
     for i in range(streaming_STK_nb, streaming_STK_nb+streaming_OPT_nb):
         # find underlying STK in ticker list and put this price at option line index in vector streaming_STK_OPT_currentPrices_vect
-        stock_ = option_entry_underlying(option_symbols_list[i-streaming_STK_nb])
+        stock_ = option_symbols_list[i-streaming_STK_nb][4:]
         stock__index = stock_symbols_list.index(stock_)
         streaming_STK_OPT_currentPrices_vect[i,0] = streaming_STK_OPT_TRADE[stock__index,0]
     print('[done] All STK prices updated in streaming_STK_OPT_currentPrices_vect.')
@@ -1505,10 +1487,9 @@ flag_vol_consecutive_same = True # use to track if in two consecutives proce upd
 # with open('/home/manu/Documents/2009___GENESIS/IB/Code/GEN_STK_HistoryList_500_210223.txt') as fp:
 # with open('/home/manu/Documents/2009___GENESIS/IB/Code/GEN_STK_HistoryList_500_201229.txt') as fp:
 # with open('/home/manu/Documents/2009___GENESIS/IB/TG/TG_240508_base/GEN_IB_STK_list.txt') as fp:
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-with open(os.path.join(BASE_DIR, 'GEN_IB_STK_list.txt')) as fp:
-    stock_symbols_list = [line.strip() for line in fp if line.strip()]
+with open('/Users/manu/Documents/code/TG_project/TG_base/GEN_IB_STK_list.txt') as fp:
+    stock_symbols_list = fp.read().split("\n")
+    del stock_symbols_list[-1] #remove blank space at the end....
 
 
 
@@ -1523,8 +1504,12 @@ STK_bloc_id = 0
 
 # Create a log file for real time messaging tracking
 # ToDo....
-with open(os.path.join(BASE_DIR, 'GEN_IB_OPT_list.txt')) as fp:
-    option_symbols_list = [line.strip() for line in fp if line.strip()]
+
+
+
+with open('/Users/manu/Documents/code/TG_project/TG_base/GEN_IB_OPT_list.txt') as fp:
+    option_symbols_list = fp.read().split("\n")
+    del option_symbols_list[-1] #remove blank space at the end....
 
 streaming_STK_nb = len(stock_symbols_list) # number of stock we follow using market data
 streaming_OPT_nb = len(option_symbols_list) # number of option we follow using market data (using same sequence as stock listing... si if follow = 10, il will follow option prices of the first 10 stocks as shown in the ticker listing...)
@@ -1548,7 +1533,7 @@ daily_full_data_slices_str_time = []
 # bid_size_list = []
 # ask_size_list = []
 
-option_contractDate_list = []
+option_contractDate_list = option_symbols_list.copy() #use to store the option contract date expiration
 streaming_STK_OPT_currentPrices_vect = np.zeros((streaming_STK_nb+streaming_OPT_nb,1)) # all STK prices vector (options contract prices, if streameing... being the underlying STK proce...)
 
 TimeStamp_Start_PROCESS_DATA_UPDATE = time.time()   #Time to track the main price update process
@@ -1627,33 +1612,26 @@ os.chdir('/Users/manu/Documents/code/TG_project/TG_base/data')
 # #################################
 fcn_DataStreaming_start_STK_All()
 
-OPTION_STRIKE_STEPS = {
-    "SPY": 1.0,
-    "SPX": 5.0,
-}
-OPTION_OTM_OFFSETS = {
-    "SPY": 5.0,
-    "SPX": 25.0,
-}
-OPTION_TRADING_CLASS = {
-    "SPX": "SPXW",
-}
+# Seed 0DTE option streaming (ATM/OTM Calls & Puts) for the chosen underlying
+UNDERLYING_0DTE_SYMBOL = "SPY"  # switch to "SPX" or another symbol if desired
+UNDERLYING_0DTE_STRIKE_STEP = 1.0  # adjust for instruments with different strike increments
+UNDERLYING_0DTE_OTM_OFFSET = 3.0   # proxy distance from ATM (~0.25 delta)
+UNDERLYING_0DTE_TRADING_CLASS = None  # e.g. "SPXW" for SPX weeklys
 
 try:
-    option_requests = load_option_requests(option_symbols_list)
-    option_metadata_cfg = prepare_option_contracts(
+    option_metadata_0dte = add_0dte_option_contracts(
         streaming_table=streaming_STK_OPT_TRADE,
         stock_symbols=stock_symbols_list,
-        option_requests=option_requests,
         option_contract_dates=option_contractDate_list,
-        strike_steps=OPTION_STRIKE_STEPS,
-        otm_offsets=OPTION_OTM_OFFSETS,
-        trading_classes=OPTION_TRADING_CLASS,
+        underlying=UNDERLYING_0DTE_SYMBOL,
+        strike_step=UNDERLYING_0DTE_STRIKE_STEP,
+        otm_offset=UNDERLYING_0DTE_OTM_OFFSET,
+        trading_class=UNDERLYING_0DTE_TRADING_CLASS,
     )
-    fcn_DataStreaming_start_0DTE_options(option_metadata_cfg, generic_tick_list="106")
-    logger.info("Option contracts attached: {}", [m["label"] for m in option_metadata_cfg])
+    logger.info("{} 0DTE contracts attached: {}", UNDERLYING_0DTE_SYMBOL, option_metadata_0dte)
+    fcn_DataStreaming_start_0DTE_options(option_metadata_0dte, generic_tick_list="106")
 except Exception as exc:
-    logger.error("Failed to seed configured option contracts: {}", exc)
+    logger.error("Failed to seed {} 0DTE contracts: {}", UNDERLYING_0DTE_SYMBOL, exc)
 
 
 # !!! Check all available stock infos and fill data_2save with the first iteration data
@@ -1686,14 +1664,12 @@ for j in range(streaming_STK_nb, streaming_STK_nb + streaming_OPT_nb + TRADE_nbM
         continue
     if meta.get("type", "").startswith("OPT"):
         if streaming_STK_OPT_TRADE[j,0] != 0 and streaming_STK_OPT_TRADE[j,1] != 0:
-            opt_label = meta.get("label")
-            if not opt_label:
-                strike = meta.get("strike")
-                try:
-                    strike_str = f"{float(strike):.2f}" if strike is not None else "NA"
-                except (TypeError, ValueError):
-                    strike_str = str(strike)
-                opt_label = f"OPT_{meta.get('right', 'U')}_{meta.get('symbol', 'UNK')}_{strike_str}"
+            strike = meta.get("strike")
+            try:
+                strike_str = f"{float(strike):.2f}" if strike is not None else "NA"
+            except (TypeError, ValueError):
+                strike_str = str(strike)
+            opt_label = f"OPT_{meta.get('right', 'U')}_{meta.get('symbol', 'UNK')}_{strike_str}"
             data_2save_OPT_list.append(opt_label)
             data_2save_OPT_list_idx.append(j)
 
