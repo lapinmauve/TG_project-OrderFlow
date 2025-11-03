@@ -39,6 +39,9 @@ def _build_option_contract(symbol: str, expiry: str, strike: float, right: str) 
     contract.lastTradeDateOrContractMonth = expiry
     contract.strike = float(strike)
     contract.right = right
+    # SPX index options use a different multiplier and exchange
+    if symbol.upper() == "SPX":
+        contract.exchange = "CBOE"
     contract.multiplier = "100"
     return contract
 
@@ -64,7 +67,6 @@ def _find_free_rows(streaming_table: np.ndarray, start_index: int, count: int) -
 
 
 def add_0dte_option_contracts(
-    app,
     streaming_table: np.ndarray,
     stock_symbols: Sequence[str],
     option_contract_dates: Optional[List[str]] = None,
@@ -73,18 +75,15 @@ def add_0dte_option_contracts(
     tz: str = "US/Eastern",
     strike_step: float = 1.0,
     otm_offset: float = 5.0,
-    generic_tick_list: str = "106",
     price_timeout: float = 10.0,
     price_poll_interval: float = 0.5,
 ) -> List[dict]:
     """
     Append four 0DTE option contracts (ATM/OTM Calls and Puts) for `underlying`
-    to the `streaming_STK_OPT_TRADE` matrix and start market data streaming.
+    to the `streaming_STK_OPT_TRADE` matrix.
 
     Parameters
     ----------
-    app : ibapi.client.EClient
-        Active client connected to TWS / IB Gateway.
     streaming_table : numpy.ndarray
         Global streaming matrix defined in TG_Reference_code.py. It is mutated in place.
     stock_symbols : Sequence[str]
@@ -99,8 +98,6 @@ def add_0dte_option_contracts(
         Rounding increment for strikes (adjust for instruments like SPX if needed).
     otm_offset : float
         Distance from ATM strike (in dollars) used as a proxy for ~0.25 delta.
-    generic_tick_list : str
-        Generic tick list used when subscribing (default includes Greeks).
 
     Returns
     -------
@@ -162,13 +159,6 @@ def add_0dte_option_contracts(
         streaming_table[row_index, :] = 0.0
         streaming_table[row_index, 0] = spec.strike
 
-        try:
-            app.cancelMktData(row_index)
-        except Exception:
-            pass
-
-        app.reqMktData(row_index, contract, generic_tick_list, False, False, [])
-
         if option_contract_dates is not None:
             option_contract_dates.append(expiry_str)
 
@@ -180,6 +170,7 @@ def add_0dte_option_contracts(
                 "right": spec.right,
                 "expiry": expiry_str,
                 "target_delta": spec.target_delta,
+                "contract": contract,
             }
         )
 

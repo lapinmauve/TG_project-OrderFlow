@@ -41,25 +41,26 @@ import pandas as pd
 import numpy as np
 import os
 import pytz
-import shutil
+# import shutil
 import requests
 
-import yfinance as yf
+# import yfinance as yf
 import sys
 
-import json
+# import json
 from dotenv import load_dotenv
-import io
+# import io
 
 from loguru import logger
 
 from add_contract_option_0dte import add_0dte_option_contracts
 
+
 logger.remove()
 # logger.add("TG_main_app.log", rotation="1024 KB")
 # logger.add("TG_main_app.log", rotation="1024 KB", level="DEBUG", backtrace=True, diagnose=True)
 # logger.add("/home/manu/Documents/2009___GENESIS/IB/TG/TG_240508_base/TG_main_app.log", rotation="1024 KB", level="DEBUG", backtrace=True, diagnose=True)
-logger.add("/home/manu/Documents/2009___GENESIS/IB/TG/TG_base/TG_main_app.log", rotation="1024 KB", level="DEBUG", backtrace=True, diagnose=True)
+logger.add("/Users/manu/Documents/code/TG_project/TG_base/TG_main_app.log", rotation="1024 KB", level="DEBUG", backtrace=True, diagnose=True)
 logger.add(sys.stdout, colorize=True, format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
 
 # logger.add(sys.stderr, level="ERROR") # Add a sink for console errors
@@ -117,11 +118,6 @@ def contractCreate(symbolEntered):
         contract1.currency = "USD"  # Currency is US dollars
         # In the API side, NASDAQ is always defined as ISLAND in the exchange field
         contract1.exchange = "ISLAND"
-
-    if symbolEntered == 'SPX':
-        contract1.secType = "IND"
-        contract1.currency = "USD"
-        contract1.exchange = "CBOE"
 
     if symbolEntered == 'VIX' or symbolEntered == 'VIX9D' or symbolEntered == 'VIX3M':
         contract1.secType = "FUT"   # Defines the security type as stock
@@ -1067,7 +1063,7 @@ def fcn_isNYSE_open(now = None):
     if not now:
         now = datetime.datetime.now(tz)
     # openTime = datetime.time(hour = 9, minute = 32, second = 0)
-    openTime = datetime.time(hour = 9, minute = 31, second = 0)
+    openTime = datetime.time(hour = 9, minute = 0, second = 0)
     closeTime = datetime.time(hour = 16, minute = 6, second = 0)
     # If before 0935 or after 1600
     if (now.time() < openTime) or (now.time() > closeTime):
@@ -1346,7 +1342,7 @@ orderExecution_PEG_MID('BRK B', 100, 0.1, 261.00)
 # #########################################################################################################################
 
 today_date = str(datetime.date.today())
-print(today_date+' ############################################## /// STARTING PROCESS /// ##############################################')
+logger.info(today_date+' ############################################## /// STARTING PROCESS /// ##############################################')
 
 #  ------- Input variables -------
 Delay_PROCESS_DATA_UPDATE = 10  # desired main time sleep (sec.) in send data refresh... put simply: the refresh rate of sended data to processing node...
@@ -1417,7 +1413,7 @@ flag_vol_consecutive_same = True # use to track if in two consecutives proce upd
 # with open('/home/manu/Documents/2009___GENESIS/IB/Code/GEN_STK_HistoryList_500_210223.txt') as fp:
 # with open('/home/manu/Documents/2009___GENESIS/IB/Code/GEN_STK_HistoryList_500_201229.txt') as fp:
 # with open('/home/manu/Documents/2009___GENESIS/IB/TG/TG_240508_base/GEN_IB_STK_list.txt') as fp:
-with open('/home/manu/Documents/2009___GENESIS/IB/TG/TG_base/GEN_IB_STK_list.txt') as fp:
+with open('/Users/manu/Documents/code/TG_project/TG_base/GEN_IB_STK_list.txt') as fp:
     stock_symbols_list = fp.read().split("\n")
     del stock_symbols_list[-1] #remove blank space at the end....
 
@@ -1437,7 +1433,7 @@ STK_bloc_id = 0
 
 
 
-with open('/home/manu/Documents/2009___GENESIS/IB/TG/TG_base/GEN_IB_OPT_list.txt') as fp:
+with open('/Users/manu/Documents/code/TG_project/TG_base/GEN_IB_OPT_list.txt') as fp:
     option_symbols_list = fp.read().split("\n")
     del option_symbols_list[-1] #remove blank space at the end....
 
@@ -1508,7 +1504,7 @@ r = requests.get(url)
 # At start-up : check if Sqlite db exist (if not, create one with a dummy first row of data)
 PathCurrent = os.getcwd()
 # change current working path to 'data' folder
-os.chdir('/home/manu/Documents/2009___GENESIS/IB/TG/TG_base/data')
+os.chdir('/Users/manu/Documents/code/TG_project/TG_base/data')
 
 # if os.path.isfile('GENESIS_DataHistory.db'):
 #     print('\n[ok] GENESIS_DataHistory.db exist in data folder.\n')
@@ -1548,7 +1544,6 @@ UNDERLYING_0DTE_OTM_OFFSET = 5.0   # proxy distance from ATM (~0.25 delta)
 
 try:
     option_metadata_0dte = add_0dte_option_contracts(
-        app=app,
         streaming_table=streaming_STK_OPT_TRADE,
         stock_symbols=stock_symbols_list,
         option_contract_dates=option_contractDate_list,
@@ -1557,8 +1552,10 @@ try:
         otm_offset=UNDERLYING_0DTE_OTM_OFFSET,
     )
     logger.info("{} 0DTE contracts attached: {}", UNDERLYING_0DTE_SYMBOL, option_metadata_0dte)
+    fcn_DataStreaming_start_0DTE_options(option_metadata_0dte, generic_tick_list="106")
 except Exception as exc:
     logger.error("Failed to seed {} 0DTE contracts: {}", UNDERLYING_0DTE_SYMBOL, exc)
+
 
 # !!! Check all available stock infos and fill data_2save with the first iteration data
 time.sleep(3)
@@ -1582,12 +1579,12 @@ for i in range(0,len(stock_symbols_list)):
         # Add ticker index to know the proper row to query in the futur
         data_2save_STK_list_idx.append(i)
 
-print(' ')
-print('data_2save_STK_list')
-print(data_2save_STK_list)
-print(' ')
-print('data_2save_STK_list_idx')
-print(data_2save_STK_list_idx)
+logger.info(' ')
+logger.info('data_2save_STK_list')
+logger.info(data_2save_STK_list)
+logger.info(' ')
+logger.info('data_2save_STK_list_idx')
+logger.info(data_2save_STK_list_idx)
 
 
 
@@ -1659,7 +1656,11 @@ while(1):  #MAIN LOOP
         print('###   saving latest data info TG_RT_latestData.parquet file   ###')
         print(' ')
 
-        curr_dataSlice_df.to_parquet('/home/manu/Documents/2009___GENESIS/IB/TG/TG_base/data/TG_RT_latestData.parquet', index=False)
+        curr_dataSlice_df.to_parquet('/Users/manu/Documents/code/TG_project/TG_base/data/TG_RT_latestData.parquet', index=False)
+
+        if CTN_Display == 60:
+            logger.info(curr_dataSlice_df)
+
 
         # Delay to make sure we avoid re-propcessing this price update many times (process triggered at each 10 seconds and pooling at each 0.25 sec...)
         time.sleep(2)
@@ -1690,7 +1691,7 @@ while(1):  #MAIN LOOP
                      strTime = np.array(daily_full_data_slices_str_time),
                      tickerNames = np.array(data_2save_STK_list) )
 
-            print('saving test .npz... done!')
+            logger.info('saving test .npz... done!')
 
         # # Send a start up message to Telegram to confirm proper start up
         # mess_txt = 'RealTimeData /// Closing !'
