@@ -1,19 +1,5 @@
 '''
-  self._target(*self._args, **self._kwargs)
-  File "/home/manu/anaconda3/envs/GEN3_38/lib/python3.8/site-packages/ibapi-10.19.4-py3.8.egg/ibapi/client.py", line 263, in run
-  File "/home/manu/anaconda3/envs/GEN3_38/lib/python3.8/site-packages/ibapi-10.19.4-py3.8.egg/ibapi/decoder.py", line 1387, in interpret
-  File "/home/manu/anaconda3/envs/GEN3_38/lib/python3.8/site-packages/ibapi-10.19.4-py3.8.egg/ibapi/decoder.py", line 1277, in processErrorMsg
-TypeError: error() takes 4 positional arguments but 5 were given
-before start
-The program has begun
-Asking server for Unix time
-The queue was empty or max time reached
-
-This is the current time from the server
-None
-{}
-(reqId: 0)   Start data streaming for symbol: AAPL
-
+### Major UPdates
 250107      MODIFY THE TELEGRAM SEND PROCESS TO GET AGGREGATED FLUSTUATION MESSAGE IF ABOVE TRESHOLD
 250203      ADD A WARNING PROCESS WHEN MANY WATCHED TICKER ARE MOVING IN THE SAME DIRECTION
 250206      ADD THE COMPLETE STOCKS DETAILS WHEN PRICE MOVMENT ALARM IS TRIGGERED
