@@ -818,10 +818,17 @@ def fcn_OptionContract_get_DateStrikes(Option_symbol, Stock_currentPrice, Option
     return Strike_Out_At_In_Money
 
 def fcn_DataStreaming_start_STK_single(_stock, _reqId):
+    global streaming_instrument_metadata
     contractObject = contractCreate(_stock)
     # app.cancelMktData(_reqId) # reset instrument before assigmnent
     # time.sleep(1.5)   # Waits for the price_update request to finish. May be increased for slower connections
     app.price_update(contractObject, _reqId)
+    streaming_instrument_metadata[_reqId] = {
+        "type": "STK",
+        "symbol": _stock,
+        "reqId": _reqId,
+        "contract": contractObject,
+    }
     time.sleep(0.5)   # Waits for the price_update request to finish. May be increased for slower connections
     print('(reqId: '+str(_reqId)+')   Start data streaming for symbol: '+_stock)
     return
@@ -829,6 +836,7 @@ def fcn_DataStreaming_start_STK_single(_stock, _reqId):
 def fcn_DataStreaming_start_STK_All(): # start streamin ALL stocl from stock_symbols_list
     global streaming_STK_nb
     global stock_symbols_list
+    global streaming_instrument_metadata
     # print(stock_symbols_list)
 
     #clearing old data to avoid overlappingof old pries on new ticker if prices do not fluctuate in the update period...
@@ -838,6 +846,7 @@ def fcn_DataStreaming_start_STK_All(): # start streamin ALL stocl from stock_sym
     streaming_STK_OPT_TRADE[:,3] = 0.0
     streaming_STK_OPT_TRADE[:,4] = 0.0
     streaming_STK_OPT_TRADE[:,5] = 0.0
+    streaming_instrument_metadata = [None] * len(streaming_instrument_metadata)
 
     # print('Cancel all current streaming slots (nb='+str(STK_bloc_load_nb)+')')
     # # Cancel all current streaming slots:
@@ -860,6 +869,7 @@ def fcn_DataStreaming_start_OPT(_stock, _OPT_exp_nbDays, _reqId):
     """
     global streaming_STK_nb
     global streaming_STK_OPT_TRADE
+    global streaming_instrument_metadata
 
     # Get the Option contract infos [strikes_OUT_money,strikes_AT_money,strikes_IN_money, contract_date]
     STK_price = streaming_STK_OPT_TRADE[_reqId-streaming_STK_nb,0]  # get the base stock actual price from streaming_STK_OPT_TRADE stock section
@@ -896,6 +906,16 @@ def fcn_DataStreaming_start_OPT(_stock, _OPT_exp_nbDays, _reqId):
     # Fill option_contractDate_list with option contract date
     option_contractDate_list[_reqId-streaming_STK_nb] = OPT_ContractDate
 
+    streaming_instrument_metadata[_reqId] = {
+        "type": "OPT",
+        "symbol": _stock,
+        "reqId": _reqId,
+        "strike": OPT_Strike,
+        "expiry": OPT_ContractDate,
+        "right": "P",
+        "contract": contractOption_FULL,
+    }
+
     return 1
 
 def fcn_DataStreaming_start_OPT_fullInfos(_stock, _strike, _contractDate, _reqId):
@@ -905,6 +925,7 @@ def fcn_DataStreaming_start_OPT_fullInfos(_stock, _strike, _contractDate, _reqId
     """
     global streaming_STK_nb
     global streaming_STK_OPT_TRADE
+    global streaming_instrument_metadata
 
     # create full PUT contract
     contractOption_FULL = contract_Option_PUT_Full(_stock, _strike, _contractDate, '100')
@@ -917,6 +938,16 @@ def fcn_DataStreaming_start_OPT_fullInfos(_stock, _strike, _contractDate, _reqId
 
     # Fill strike price in streaming_100_OPT array (col# 0)
     streaming_STK_OPT_TRADE[_reqId,0] = _strike
+
+    streaming_instrument_metadata[_reqId] = {
+        "type": "OPT",
+        "symbol": _stock,
+        "reqId": _reqId,
+        "strike": _strike,
+        "expiry": _contractDate,
+        "right": "P",
+        "contract": contractOption_FULL,
+    }
 
     return 1
 
@@ -986,6 +1017,7 @@ def fcn_DataStreaming_start_OPT_TRADE(_stock, _OPT_exp_nbDays, TRADE_slot_nb):
     global streaming_TRADE_first_index
     global streaming_STK_OPT_TRADE
     global stock_symbols_list
+    global streaming_instrument_metadata
 
     #get stock index in streaming_STK_OPT_TRADE
     try:
@@ -1020,9 +1052,61 @@ def fcn_DataStreaming_start_OPT_TRADE(_stock, _OPT_exp_nbDays, TRADE_slot_nb):
     streaming_STK_OPT_TRADE[_reqId,0] = OPT_Strike
 
 
+    streaming_instrument_metadata[_reqId] = {
+        "type": "OPT_TRADE",
+        "symbol": _stock,
+        "reqId": _reqId,
+        "strike": OPT_Strike,
+        "expiry": OPT_ContractDate,
+        "right": "P",
+        "contract": contractOption_FULL,
+    }
+
+
     return [_stock, stock__index, OPT_Strike, OPT_ContractDate]
 
 
+
+def fcn_DataStreaming_start_0DTE_options(option_metadata, generic_tick_list="106"):
+    global app
+    global streaming_instrument_metadata
+
+    for entry in option_metadata:
+        req_id = entry["reqId"]
+        contract = entry["contract"]
+        label = entry.get("label", "OPT")
+
+        try:
+            app.cancelMktData(req_id)
+            time.sleep(0.5)
+        except Exception:
+            pass
+
+        app.reqMktData(req_id, contract, generic_tick_list, False, False, [])
+        streaming_instrument_metadata[req_id] = {
+            "type": "OPT_0DTE",
+            "symbol": contract.symbol,
+            "reqId": req_id,
+            "strike": entry.get("strike"),
+            "expiry": entry.get("expiry"),
+            "right": entry.get("right"),
+            "contract": contract,
+        }
+        logger.info(
+            "Started streaming for {} (reqId={}, strike={}, right={}, expiry={})",
+            label,
+            req_id,
+            entry.get("strike"),
+            entry.get("right"),
+            entry.get("expiry"),
+        )
+        time.sleep(0.5)
+
+
+def fcn_get_instrument_metadata_list():
+    """Return a snapshot of instrument metadata for each streaming slot."""
+    global streaming_instrument_metadata
+    return list(streaming_instrument_metadata)
 
 def fcn_DataStreaming_stop_OPT_TRADE(_stock, TRADE_slot_nb):
     """
@@ -1032,6 +1116,7 @@ def fcn_DataStreaming_stop_OPT_TRADE(_stock, TRADE_slot_nb):
     global streaming_TRADE_first_index
     global streaming_STK_OPT_TRADE
     global stock_symbols_list
+    global streaming_instrument_metadata
 
     #get stock index in streaming_STK_OPT_TRADE
     try:
@@ -1053,6 +1138,8 @@ def fcn_DataStreaming_stop_OPT_TRADE(_stock, TRADE_slot_nb):
 
     app.cancelMktData(_reqId)
     time.sleep(2.0)
+
+    streaming_instrument_metadata[_reqId] = None
 
     return 1
 
@@ -1447,6 +1534,7 @@ ATR_STK_vect = np.zeros((streaming_STK_nb+streaming_OPT_nb,1))
 #stock_symbols_list = list(stocks_df['symbol'])
 #stock_symbols_list.insert(0, 'TICKER')  # add a TICKER header at first position
 streaming_STK_OPT_TRADE = np.zeros((streaming_STK_nb+streaming_OPT_nb+TRADE_nbMAX_slots,6))
+streaming_instrument_metadata = [None] * (streaming_STK_nb + streaming_OPT_nb + TRADE_nbMAX_slots)
 # STK_vol_matrix = np.zeros((streaming_STK_nb,2))
 # STK_vol_matrix_update = np.zeros((streaming_STK_nb,2))
 daily_full_data_slices = []
