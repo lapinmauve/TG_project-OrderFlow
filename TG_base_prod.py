@@ -414,7 +414,7 @@ class TestWrapper(EWrapper):
                 streaming_STK_OPT_TRADE[reqId,0] = price
 
         # Fill streaming_STK_OPT_TRADE ----> "OPTION section" global array
-        if reqId >= streaming_STK_nb: # and reqId < streaming_TRADE_first_index:
+        if reqId >= streaming_STK_nb:
             # Use tickType 1 for bid Price (col #1)
             if tickType == 1:
                 streaming_STK_OPT_TRADE[reqId,1] = price
@@ -422,6 +422,14 @@ class TestWrapper(EWrapper):
             # Use tickType 2 for ask Price (col #2)
             if tickType == 2:
                 streaming_STK_OPT_TRADE[reqId,2] = price
+
+            if tickType in (1, 2, 4):
+                logger.debug(
+                    "tickPrice option reqId={} type={} price={}",
+                    reqId,
+                    tickType,
+                    price,
+                )
 
             # Update Option SENS ratio when bid or ask are updated
             # streaming_STK_OPT_TRADE[reqId,3] = (    (streaming_STK_OPT_TRADE[reqId,0] * 0.03) / ((streaming_STK_OPT_TRADE[reqId,1] + streaming_STK_OPT_TRADE[reqId,2] / 2.0 ) + 0.001   )    ) * 100.0
@@ -470,7 +478,6 @@ class TestWrapper(EWrapper):
 
 
 #        # Fill OPTION global array
-#        if reqId >= streaming_STK_nb and reqId < streaming_TRADE_first_index:
 #            if tickType == 8:
 #                streaming_STK_OPT_TRADE[reqId-100,3] = size
 
@@ -1026,7 +1033,6 @@ def fcn_DataStreaming_start_OPT_TRADE(_stock, _OPT_exp_nbDays, TRADE_slot_nb):
     TRADE_slot_nb: the slot number (0,1,2,3,4...) used by the BUY/SELL TRADE process
 
     """
-    global streaming_TRADE_first_index
     global streaming_STK_OPT_TRADE
     global stock_symbols_list
     global streaming_instrument_metadata
@@ -1041,7 +1047,8 @@ def fcn_DataStreaming_start_OPT_TRADE(_stock, _OPT_exp_nbDays, TRADE_slot_nb):
 
     # Get the Option contract infos [strikes_OUT_money,strikes_AT_money,strikes_IN_money, contract_date]
     STK_price = streaming_STK_OPT_TRADE[stock__index,0]  # get the base stock actual price from streaming_STK_OPT_TRADE stock section
-    optionContractInfos = fcn_OptionContract_get_DateStrikes(_stock, STK_price, _OPT_exp_nbDays, streaming_TRADE_first_index+TRADE_slot_nb)
+    _reqId = streaming_STK_nb + streaming_OPT_nb + TRADE_slot_nb
+    optionContractInfos = fcn_OptionContract_get_DateStrikes(_stock, STK_price, _OPT_exp_nbDays, _reqId)
 
     if optionContractInfos[0] == 0:
         print('No contract found!!!  .......................... SKIP this option contract streaming!!!')
@@ -1055,7 +1062,6 @@ def fcn_DataStreaming_start_OPT_TRADE(_stock, _OPT_exp_nbDays, TRADE_slot_nb):
     print('PUT Option contract desc: ',contractOption_FULL)
 
     # clear instrument to reset
-    _reqId = TRADE_slot_nb + streaming_TRADE_first_index
     app.cancelMktData(_reqId)
     time.sleep(2.0)
     app.reqMktData(_reqId, contractOption_FULL, '', False, False, [])
@@ -1134,7 +1140,6 @@ def fcn_DataStreaming_stop_OPT_TRADE(_stock, TRADE_slot_nb):
     TRADE_slot_nb: the slot number (0,1,2,3,4...) used by the BUY/SELL TRADE process
 
     """
-    global streaming_TRADE_first_index
     global streaming_STK_OPT_TRADE
     global stock_symbols_list
     global streaming_instrument_metadata
@@ -1147,7 +1152,7 @@ def fcn_DataStreaming_stop_OPT_TRADE(_stock, TRADE_slot_nb):
         return 0 # error flag
 
     # clear instrument to reset
-    _reqId = TRADE_slot_nb + streaming_TRADE_first_index
+    _reqId = streaming_STK_nb + streaming_OPT_nb + TRADE_slot_nb
 
     # set streaming_STK_OPT_TRADE current TRADE rows values to zero
     streaming_STK_OPT_TRADE[_reqId,0] = 0
@@ -1528,7 +1533,6 @@ with open(os.path.join(BASE_DIR, 'GEN_IB_OPT_list.txt')) as fp:
 
 streaming_STK_nb = len(stock_symbols_list) # number of stock we follow using market data
 streaming_OPT_nb = len(option_symbols_list) # number of option we follow using market data (using same sequence as stock listing... si if follow = 10, il will follow option prices of the first 10 stocks as shown in the ticker listing...)
-streaming_TRADE_first_index =  streaming_STK_nb + streaming_OPT_nb
 
 ATR_STK_vect = np.zeros((streaming_STK_nb+streaming_OPT_nb,1))
 
