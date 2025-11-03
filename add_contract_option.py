@@ -1,10 +1,10 @@
 """
 Flexible option contract preparation utilities.
 
-This module reads symbolic option configuration entries (e.g.
-``OPT_SPY_0DTE_CALL_ATM``) and prepares corresponding IBKR option contracts.
-Each configuration will allocate one row in the shared streaming array, store
-the strike, and return metadata ready for streaming.
+This module parses symbolic option configuration entries (e.g.
+``OPT_SPY_0DTE_CALL_ATM``) and prepares the corresponding IBKR option contracts.
+It only mutates the shared streaming array; the caller is responsible for
+issuing market-data subscriptions using the returned metadata.
 """
 
 from __future__ import annotations
@@ -81,31 +81,28 @@ def _find_free_rows(streaming_table: np.ndarray, start_index: int, count: int) -
 
 
 def parse_option_config_line(line: str) -> OptionRequest:
-    """
-    Convert strings like ``OPT_SPY_0DTE_CALL_ATM`` into OptionRequest objects.
-    """
     parts = line.strip().split("_")
     if len(parts) != 5 or parts[0] != "OPT":
         raise ValueError(f"Invalid option configuration entry: {line}")
 
-    symbol = parts[1]
-    dte_part = parts[2]
-    if not dte_part.endswith("DTE"):
+    symbol = parts[1].upper()
+    dte_token = parts[2]
+    if not dte_token.endswith("DTE"):
         raise ValueError(f"Invalid DTE token in entry: {line}")
-    days_to_expiry = int(dte_part[:-3])
+    days_to_expiry = int(dte_token[:-3])
 
-    right_part = parts[3].upper()
-    if right_part not in ("CALL", "PUT"):
+    right_token = parts[3].upper()
+    if right_token not in {"CALL", "PUT"}:
         raise ValueError(f"Invalid option right in entry: {line}")
-    right = "C" if right_part == "CALL" else "P"
+    right = "C" if right_token == "CALL" else "P"
 
     moneyness = parts[4].upper()
-    if moneyness not in ("ATM", "OTM"):
+    if moneyness not in {"ATM", "OTM"}:
         raise ValueError(f"Invalid moneyness in entry: {line}")
 
     return OptionRequest(
         label=line.strip(),
-        symbol=symbol.upper(),
+        symbol=symbol,
         days_to_expiry=days_to_expiry,
         right=right,
         moneyness=moneyness,
@@ -119,6 +116,7 @@ def load_option_requests(config_lines: Iterable[str]) -> List[OptionRequest]:
         if not line or line.startswith("#"):
             continue
         requests.append(parse_option_config_line(line))
+    logger.debug("Loaded option requests: {}", [req.label for req in requests])
     return requests
 
 
@@ -138,20 +136,23 @@ def prepare_option_contracts(
     """
     Prepare option contracts for the given requests and fill the streaming table.
 
-    Returns a metadata list where each entry contains reqId, label, contract, etc.
+    Returns metadata entries ready to feed into streaming.
     """
     strike_steps = strike_steps or {}
     otm_offsets = otm_offsets or {}
     trading_classes = trading_classes or {}
 
     if not option_requests:
+        logger.debug("No option requests provided; skipping contract preparation.")
         return []
 
     timezone_obj = pytz.timezone(timezone)
     now = dt.datetime.now(timezone_obj)
+    logger.debug("Preparing {} option contracts at {}", len(option_requests), now)
 
     start_index = len(stock_symbols)
     free_rows = _find_free_rows(streaming_table, start_index, len(option_requests))
+    logger.debug("Free rows discovered: {}", free_rows)
     if len(free_rows) < len(option_requests):
         raise RuntimeError("Not enough free rows to allocate option contracts.")
 
@@ -167,10 +168,18 @@ def prepare_option_contracts(
         while underlying_price <= 0.0 and time.time() < deadline:
             time.sleep(price_poll_interval)
             underlying_price = float(streaming_table[underlying_idx, 0])
+
         if underlying_price <= 0.0:
             raise ValueError(
                 f"{request.symbol} price unavailable after waiting {price_timeout} seconds."
             )
+
+        logger.debug(
+            "Request {} -> underlying price {:.4f} (index {})",
+            request.label,
+            underlying_price,
+            underlying_idx,
+        )
 
         if request.days_to_expiry == 0:
             expiry_dt = _next_trading_day(now)
@@ -199,11 +208,22 @@ def prepare_option_contracts(
             trading_class=trading_class,
         )
 
+        logger.debug(
+            "Configured contract {} -> strike {:.2f}, expiry {}, tradingClass={}, req row {}",
+            request.label,
+            strike,
+            expiry_str,
+            trading_class,
+            row_index,
+        )
+
         streaming_table[row_index, :] = 0.0
         streaming_table[row_index, 0] = strike
 
         if option_contract_dates is not None:
-            option_contract_dates.append(expiry_str)
+            while len(option_contract_dates) <= row_index:
+                option_contract_dates.append("")
+            option_contract_dates[row_index] = expiry_str
 
         metadata.append(
             {
@@ -218,13 +238,6 @@ def prepare_option_contracts(
             }
         )
 
-        logger.info(
-            "Prepared option contract {} -> {} strike {} expiry {} row {}",
-            request.label,
-            contract.symbol,
-            strike,
-            expiry_str,
-            row_index,
-        )
-
+    logger.debug("Prepared option metadata: {}", metadata)
     return metadata
+

@@ -40,7 +40,7 @@ from dotenv import load_dotenv
 
 from loguru import logger
 
-from add_contract_option_0dte import add_0dte_option_contracts
+from add_contract_option import load_option_requests, prepare_option_contracts
 
 
 logger.remove()
@@ -816,6 +816,7 @@ def fcn_DataStreaming_start_STK_single(_stock, _reqId):
         "reqId": _reqId,
         "contract": contractObject,
     }
+    logger.debug("Started stock stream reqId={} symbol={}", _reqId, _stock)
     time.sleep(0.5)   # Waits for the price_update request to finish. May be increased for slower connections
     print('(reqId: '+str(_reqId)+')   Start data streaming for symbol: '+_stock)
     return
@@ -833,7 +834,7 @@ def fcn_DataStreaming_start_STK_All(): # start streamin ALL stocl from stock_sym
     streaming_STK_OPT_TRADE[:,3] = 0.0
     streaming_STK_OPT_TRADE[:,4] = 0.0
     streaming_STK_OPT_TRADE[:,5] = 0.0
-    streaming_instrument_metadata = [None] * len(streaming_instrument_metadata)
+    streaming_instrument_metadata = [None] * streaming_STK_OPT_TRADE.shape[0]
 
     # print('Cancel all current streaming slots (nb='+str(STK_bloc_load_nb)+')')
     # # Cancel all current streaming slots:
@@ -901,7 +902,16 @@ def fcn_DataStreaming_start_OPT(_stock, _OPT_exp_nbDays, _reqId):
         "expiry": OPT_ContractDate,
         "right": "P",
         "contract": contractOption_FULL,
+        "label": f"OPT_{_stock}_{OPT_Strike}",
     }
+
+    logger.debug(
+        "Started option stream reqId={} symbol={} strike={} expiry={} type=PUT",
+        _reqId,
+        _stock,
+        OPT_Strike,
+        OPT_ContractDate,
+    )
 
     return 1
 
@@ -934,7 +944,16 @@ def fcn_DataStreaming_start_OPT_fullInfos(_stock, _strike, _contractDate, _reqId
         "expiry": _contractDate,
         "right": "P",
         "contract": contractOption_FULL,
+        "label": f"OPT_{_stock}_{_strike}",
     }
+
+    logger.debug(
+        "Started option stream reqId={} symbol={} strike={} expiry={} type=PUT",
+        _reqId,
+        _stock,
+        _strike,
+        _contractDate,
+    )
 
     return 1
 
@@ -1047,7 +1066,16 @@ def fcn_DataStreaming_start_OPT_TRADE(_stock, _OPT_exp_nbDays, TRADE_slot_nb):
         "expiry": OPT_ContractDate,
         "right": "P",
         "contract": contractOption_FULL,
+        "label": f"OPTTRADE_{_stock}_{OPT_Strike}",
     }
+
+    logger.debug(
+        "Started trade slot stream reqId={} symbol={} strike={} expiry={} type=PUT",
+        _reqId,
+        _stock,
+        OPT_Strike,
+        OPT_ContractDate,
+    )
 
 
     return [_stock, stock__index, OPT_Strike, OPT_ContractDate]
@@ -1071,25 +1099,25 @@ def fcn_DataStreaming_start_0DTE_options(option_metadata, generic_tick_list="106
 
         app.reqMktData(req_id, contract, generic_tick_list, False, False, [])
         streaming_instrument_metadata[req_id] = {
-            "type": "OPT_0DTE",
+            "type": entry.get("type", "OPT_CFG"),
             "symbol": contract.symbol,
             "reqId": req_id,
             "strike": entry.get("strike"),
             "expiry": entry.get("expiry"),
             "right": entry.get("right"),
             "contract": contract,
+            "label": label,
         }
-        logger.info(
-            "Started streaming for {} (reqId={}, strike={}, right={}, expiry={})",
-            label,
+        logger.debug(
+            "Streaming configured option reqId={} label={} symbol={} strike={} expiry={} type={}",
             req_id,
+            label,
+            contract.symbol,
             entry.get("strike"),
-            entry.get("right"),
             entry.get("expiry"),
+            entry.get("right"),
         )
         time.sleep(0.5)
-
-
 def fcn_get_instrument_metadata_list():
     """Return a snapshot of instrument metadata for each streaming slot."""
     global streaming_instrument_metadata
@@ -1612,26 +1640,33 @@ os.chdir('/Users/manu/Documents/code/TG_project/TG_base/data')
 # #################################
 fcn_DataStreaming_start_STK_All()
 
-# Seed 0DTE option streaming (ATM/OTM Calls & Puts) for the chosen underlying
-UNDERLYING_0DTE_SYMBOL = "SPY"  # switch to "SPX" or another symbol if desired
-UNDERLYING_0DTE_STRIKE_STEP = 1.0  # adjust for instruments with different strike increments
-UNDERLYING_0DTE_OTM_OFFSET = 3.0   # proxy distance from ATM (~0.25 delta)
-UNDERLYING_0DTE_TRADING_CLASS = None  # e.g. "SPXW" for SPX weeklys
+OPTION_STRIKE_STEPS = {
+    "SPY": 1.0,
+    "SPX": 5.0,
+}
+OPTION_OTM_OFFSETS = {
+    "SPY": 3.0,
+    "SPX": 25.0,
+}
+OPTION_TRADING_CLASS = {
+    "SPX": "SPXW",
+}
 
 try:
-    option_metadata_0dte = add_0dte_option_contracts(
+    option_requests = load_option_requests(option_symbols_list)
+    option_metadata_cfg = prepare_option_contracts(
         streaming_table=streaming_STK_OPT_TRADE,
         stock_symbols=stock_symbols_list,
+        option_requests=option_requests,
         option_contract_dates=option_contractDate_list,
-        underlying=UNDERLYING_0DTE_SYMBOL,
-        strike_step=UNDERLYING_0DTE_STRIKE_STEP,
-        otm_offset=UNDERLYING_0DTE_OTM_OFFSET,
-        trading_class=UNDERLYING_0DTE_TRADING_CLASS,
+        strike_steps=OPTION_STRIKE_STEPS,
+        otm_offsets=OPTION_OTM_OFFSETS,
+        trading_classes=OPTION_TRADING_CLASS,
     )
-    logger.info("{} 0DTE contracts attached: {}", UNDERLYING_0DTE_SYMBOL, option_metadata_0dte)
-    fcn_DataStreaming_start_0DTE_options(option_metadata_0dte, generic_tick_list="106")
+    logger.info("Option contracts configured: {}", [entry["label"] for entry in option_metadata_cfg])
+    fcn_DataStreaming_start_0DTE_options(option_metadata_cfg, generic_tick_list="106")
 except Exception as exc:
-    logger.error("Failed to seed {} 0DTE contracts: {}", UNDERLYING_0DTE_SYMBOL, exc)
+    logger.exception("Failed to seed configured option contracts")
 
 
 # !!! Check all available stock infos and fill data_2save with the first iteration data
