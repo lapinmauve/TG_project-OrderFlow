@@ -26,7 +26,7 @@ class OptionRequest:
     symbol: str
     days_to_expiry: int
     right: str  # 'C' or 'P'
-    moneyness: str  # 'ATM' or 'OTM'
+    offset: float
 
 
 def _build_option_contract(
@@ -82,7 +82,7 @@ def _find_free_rows(streaming_table: np.ndarray, start_index: int, count: int) -
 
 def parse_option_config_line(line: str) -> OptionRequest:
     parts = line.strip().split("_")
-    if len(parts) != 5 or parts[0] != "OPT":
+    if len(parts) not in (5, 6) or parts[0] != "OPT":
         raise ValueError(f"Invalid option configuration entry: {line}")
 
     symbol = parts[1].upper()
@@ -96,16 +96,33 @@ def parse_option_config_line(line: str) -> OptionRequest:
         raise ValueError(f"Invalid option right in entry: {line}")
     right = "C" if right_token == "CALL" else "P"
 
-    moneyness = parts[4].upper()
-    if moneyness not in {"ATM", "OTM"}:
-        raise ValueError(f"Invalid moneyness in entry: {line}")
+    offset_token_index = 4
+    if len(parts) == 6:
+        base_token = parts[4].upper()
+        if base_token != "ATM":
+            raise ValueError(f"Unexpected base token '{base_token}' in entry: {line}")
+        offset_token_index = 5
+    elif len(parts) == 5 and parts[4].upper() == "ATM":
+        # Default ATM contract with zero offset
+        return OptionRequest(
+            label=line.strip(),
+            symbol=symbol,
+            days_to_expiry=days_to_expiry,
+            right=right,
+            offset=0.0,
+        )
+
+    try:
+        offset = float(parts[offset_token_index])
+    except ValueError:
+        raise ValueError(f"Invalid offset in entry: {line}")
 
     return OptionRequest(
         label=line.strip(),
         symbol=symbol,
         days_to_expiry=days_to_expiry,
         right=right,
-        moneyness=moneyness,
+        offset=offset,
     )
 
 
@@ -130,7 +147,6 @@ def prepare_option_contracts(
     price_timeout: float = 10.0,
     price_poll_interval: float = 0.5,
     strike_steps: Optional[Dict[str, float]] = None,
-    otm_offsets: Optional[Dict[str, float]] = None,
     trading_classes: Optional[Dict[str, str]] = None,
 ) -> List[dict]:
     """
@@ -139,7 +155,6 @@ def prepare_option_contracts(
     Returns metadata entries ready to feed into streaming.
     """
     strike_steps = strike_steps or {}
-    otm_offsets = otm_offsets or {}
     trading_classes = trading_classes or {}
 
     if not option_requests:
@@ -190,14 +205,8 @@ def prepare_option_contracts(
         step = strike_steps.get(request.symbol, 1.0)
         atm_strike = round(round(underlying_price / step) * step, 2)
 
-        offset = otm_offsets.get(request.symbol, step)
-        if request.moneyness == "ATM":
-            strike = atm_strike
-        else:
-            if request.right == "C":
-                strike = round(atm_strike + offset, 2)
-            else:
-                strike = round(max(step, atm_strike - offset), 2)
+        raw_strike = atm_strike + request.offset
+        strike = round(round(raw_strike / step) * step, 2)
 
         trading_class = trading_classes.get(request.symbol)
         contract = _build_option_contract(
@@ -209,9 +218,10 @@ def prepare_option_contracts(
         )
 
         logger.debug(
-            "Configured contract {} -> strike {:.2f}, expiry {}, tradingClass={}, req row {}",
+            "Configured contract {} -> strike {:.2f} (offset {}), expiry {}, tradingClass={}, req row {}",
             request.label,
             strike,
+            request.offset,
             expiry_str,
             trading_class,
             row_index,
@@ -240,4 +250,3 @@ def prepare_option_contracts(
 
     logger.debug("Prepared option metadata: {}", metadata)
     return metadata
-
