@@ -381,7 +381,6 @@ class TestWrapper(EWrapper):
             # "PastLimit:", attrib.pastLimit, end=' ')
 
         global streaming_STK_OPT_TRADE  # Declares that we want stockPrice to be treated as a global variable
-        global streaming_100_OPT
         global ATR_STK_vect
         global streaming_STK_OPT_currentPrices_vect
         # global bid_price_list
@@ -389,54 +388,48 @@ class TestWrapper(EWrapper):
 
 
         # Fill streaming_STK_OPT_TRADE ----> "STOCK section" global array
-        if reqId < streaming_STK_nb:
+        # if reqId < streaming_STK_nb:
             # Use tickType 1 for bid Price (col #1)
-            if tickType == 1:
-                streaming_STK_OPT_TRADE[reqId,1] = price
-                # bid_price_list.append(streaming_STK_OPT_TRADE[:,1])
+        if tickType == 1:
+            streaming_STK_OPT_TRADE[reqId,1] = price
+            # bid_price_list.append(streaming_STK_OPT_TRADE[:,1])
 
-            # Use tickType 2 for ask Price (col #2)
-            if tickType == 2:
-                streaming_STK_OPT_TRADE[reqId,2] = price
-                # ask_price_list.append(streaming_STK_OPT_TRADE[:,2])
+        # Use tickType 2 for ask Price (col #2)
+        if tickType == 2:
+            streaming_STK_OPT_TRADE[reqId,2] = price
+            # ask_price_list.append(streaming_STK_OPT_TRADE[:,2])
 
 
-            # Use tickType 4 (Last Price) if you are running during the market day (col #0)
-            if tickType == 4:
+        # Use tickType 4 (Last Price) if you are running during the market day (col #0)
+        if tickType == 4:
 
-    #            print('\nNew Tick Price for '+stock_symbols_list[int(reqId)]+' @ ' + str(price))
-                streaming_STK_OPT_TRADE[reqId,0] = price
+#            print('\nNew Tick Price for '+stock_symbols_list[int(reqId)]+' @ ' + str(price))
+            streaming_STK_OPT_TRADE[reqId,0] = price
 
-            # Uses tickType 9 (Close Price) if after market hours  (col #0)
-            elif tickType == 9:
-    #            print('\nNew Tick Price for '+stock_symbols_list[int(reqId)]+' @ ' + str(price))
+        # Uses tickType 9 (Close Price) if after market hours  (col #0)
+        elif tickType == 9:
+            streaming_STK_OPT_TRADE[reqId,0] = price
 
-    #            stockPrice = price
-                streaming_STK_OPT_TRADE[reqId,0] = price
+        # # Fill streaming_STK_OPT_TRADE ----> "OPTION section" global array
+        # # if reqId >= streaming_STK_nb:
+        #     # Use tickType 1 for bid Price (col #1)
+        #     if tickType == 1:
+        #         streaming_STK_OPT_TRADE[reqId,1] = price
 
-        # Fill streaming_STK_OPT_TRADE ----> "OPTION section" global array
-        if reqId >= streaming_STK_nb:
-            # Use tickType 1 for bid Price (col #1)
-            if tickType == 1:
-                streaming_STK_OPT_TRADE[reqId,1] = price
+        #     # Use tickType 2 for ask Price (col #2)
+        #     if tickType == 2:
+        #         streaming_STK_OPT_TRADE[reqId,2] = price
 
-            # Use tickType 2 for ask Price (col #2)
-            if tickType == 2:
-                streaming_STK_OPT_TRADE[reqId,2] = price
+        #     if tickType == 4:
+        #         streaming_STK_OPT_TRADE[reqId,0] = price
 
-            if tickType in (1, 2, 4):
-                logger.debug(
-                    "tickPrice option reqId={} type={} price={}",
-                    reqId,
-                    tickType,
-                    price,
-                )
-
-            # Update Option SENS ratio when bid or ask are updated
-            # streaming_STK_OPT_TRADE[reqId,3] = (    (streaming_STK_OPT_TRADE[reqId,0] * 0.03) / ((streaming_STK_OPT_TRADE[reqId,1] + streaming_STK_OPT_TRADE[reqId,2] / 2.0 ) + 0.001   )    ) * 100.0
-            # streaming_STK_OPT_TRADE[reqId,3] = (    ATR_STK_vect[reqId,0]/ ((streaming_STK_OPT_TRADE[reqId,1] + streaming_STK_OPT_TRADE[reqId,2] / 2.0 ) + 0.001   )    ) * 100.0
-            # streaming_STK_OPT_TRADE[reqId,3] = (    ATR_STK_vect[reqId,0]/ (((streaming_STK_OPT_TRADE[reqId,1] + streaming_STK_OPT_TRADE[reqId,2]) / 2.0 ) + 0.001   )    ) * 100.0
-            # streaming_STK_OPT_TRADE[reqId,3] = (    ATR_STK_vect[reqId,0]/ (((streaming_STK_OPT_TRADE[reqId,1] + streaming_STK_OPT_TRADE[reqId,2]) / 2.0 ) - (streaming_STK_OPT_TRADE[reqId,0] - streaming_STK_OPT_currentPrices_vect[reqId,0] )   )    ) * 100.0
+        #     # if tickType in (1, 2, 4):
+        #     #     logger.debug(
+        #     #         "tickPrice option reqId={} type={} price={}",
+        #     #         reqId,
+        #     #         tickType,
+        #     #         price,
+        #     #     )
 
 
 
@@ -447,40 +440,22 @@ class TestWrapper(EWrapper):
 #        print("Tick Size. Ticker Id:", reqId, "tickType:", tickType, "Size:", size)
 
         global streaming_STK_OPT_TRADE  # Declares that we want stockPrice to be treated as a global variable
-        # global bid_size_list
-        # global ask_size_list
-        # global data_2save_STK_list_idx
 
 
         # Fill STK global array
-        if reqId < streaming_STK_nb:
-            # Use tickType 8 for delta volume : previous - current incrasing v0lume data (col #3)
-            if tickType == 8:
-                streaming_STK_OPT_TRADE[reqId,3] = size
+        # Use tickType 8 for delta volume : previous - current incrasing v0lume data (col #3)
+        if tickType == 8:
+            streaming_STK_OPT_TRADE[reqId,3] = size
 
-            # Use tickType 0 for bid Size (col #5)
-            if tickType == 0:
-                # streaming_STK_OPT_TRADE[reqId,4] = size
-                # streaming_STK_OPT_TRADE[reqId,4] = streaming_STK_OPT_TRADE[reqId,4]  + int(size)
-                streaming_STK_OPT_TRADE[reqId,4] += int(size)
-                # temp_array = np.zeros((len(data_2save_STK_list_idx),1))
-                # temp_array[reqId,0] = size
-                # bid_size_list.append(temp_array)
+        # Use tickType 0 for bid Size (col #5)
+        if tickType == 0:
+            streaming_STK_OPT_TRADE[reqId,4] += int(size)
 
 
-            # Use tickType 3 for ask Size (col #6)
-            if tickType == 3:
-                # streaming_STK_OPT_TRADE[reqId,5] = size
-                # streaming_STK_OPT_TRADE[reqId,5] = streaming_STK_OPT_TRADE[reqId,5] + int(size)
-                streaming_STK_OPT_TRADE[reqId,5] += int(size)
-                # temp_array = np.zeros((len(data_2save_STK_list_idx),1))
-                # temp_array[reqId,0] = size
-                # ask_size_list.append(temp_array)
+        # Use tickType 3 for ask Size (col #6)
+        if tickType == 3:
+            streaming_STK_OPT_TRADE[reqId,5] += int(size)
 
-
-#        # Fill OPTION global array
-#            if tickType == 8:
-#                streaming_STK_OPT_TRADE[reqId-100,3] = size
 
     def tickString(self, reqId: TickerId, tickType: TickType, value: str):
         super().tickString(reqId, tickType, value)
@@ -1460,54 +1435,17 @@ logger.info(today_date+' ############################################## /// STAR
 
 #  ------- Input variables -------
 Delay_PROCESS_DATA_UPDATE = 10  # desired main time sleep (sec.) in send data refresh... put simply: the refresh rate of sended data to processing node...
-# Delay_PROCESS_MESSAGE_UPDATE = 60  # desired main time sleep (sec.) in incoming message pooling... put simply: the refresh rate of sended data to processing node...
 CTN_Display_refresh_nb = 90 # desired refresh period displaying informations on screen based in nb. Delay_PROCESS_DATA_UPDATE. ex: CTN_Display_refresh_nb = 6 ---> run this process each minutes because main loop is running each 10 seconds (6 * 10 = 60 sec = 1 minute).
-TRADE_nbMAX_slots = 10  # the number of trade in same time
 opt_expDelay_nDays = 12 # desired OPTION expiration delay in days
 
 
-# STK_bloc_load_nb = 50  # the number of ticker we load at each time we update prices...
-# DataMatrix_NbCols = 2500 # number of data points we keep in analysis
-
-
-# # ------------------------------------ Connect to DynamoDB ------------------------------------
-# with open('/home/manu/Documents/2009___GENESIS/IB/Code/KalmanSettup.txt') as f:
-#     lines = f.readlines()
-
-# dynamodb = boto3.resource(service_name = 'dynamodb',region_name = 'ca-central-1',
-#               aws_access_key_id = lines[0][3:-1],
-#               aws_secret_access_key = lines[1][:-3])
-
-# table = dynamodb.Table('tg_data_tb')
-# ------------------------------------ -------------------- ------------------------------------
-
-# s3 = boto3.resource(
-#     's3',
-#     region_name='ca-central-1',
-#     aws_access_key_id = lines[0][3:-1],
-#     aws_secret_access_key = lines[1][:-3])
-
-
-
-# bucket_name = 'mnu-tg-bucket'
 
 
 today_date = str(datetime.date.today())
-# screening_CTN = -180  #if negative: delay imposed before we start the stock srenning processs, -180 means .5 hour (on a 360 updates per hour basis)
 
 
 CTN_retry_streaming = 0
 flag_chec_dataArrayIsFull = 0 # to check if IB data streaming process has done all required STK and OPT as planned!!!
-#Telegram infos to be able to send stuff...
-# Email user infos loading for futur message send and retreival...
-# with open('/home/manu/Documents/2009___GENESIS/IB/TG/TG_240508_base/LogInfos.txt', 'r') as fp:
-#     LogInfos_data = fp.read().split("\n")
-#     data_tk = LogInfos_data[6]
-#     TOKEN = LogInfos_data[12]
-#     CHAT_ID = int(LogInfos_data[13] )
-# print(data_tk)
-# print(TOKEN)
-# print(CHAT_ID)
 
 
 CHAT_ID_debugg = 7332899055 #Myself
@@ -1519,7 +1457,6 @@ CHAT_ID = int(os.getenv("CHAT_ID"))
 
 
 
-# db_size = os.path.getsize('/home/manu/Documents/2009___GENESIS/IB/Code/data/GENESIS_DataHistory.db')
 flag_vol_consecutive_same = True # use to track if in two consecutives proce update, the STK volume section has change or not... to detect id market are closed in holllidays...
 
 # Load stock list and option list to track in IB streaming process
@@ -1537,8 +1474,8 @@ streaming_OPT_nb = len(option_symbols_list) # number of option we follow using m
 
 ATR_STK_vect = np.zeros((streaming_STK_nb+streaming_OPT_nb,1))
 
-streaming_STK_OPT_TRADE = np.zeros((streaming_STK_nb+streaming_OPT_nb+TRADE_nbMAX_slots,6))
-streaming_instrument_metadata = [None] * (streaming_STK_nb + streaming_OPT_nb + TRADE_nbMAX_slots)
+streaming_STK_OPT_TRADE = np.zeros((streaming_STK_nb+streaming_OPT_nb,6))
+streaming_instrument_metadata = [None] * (streaming_STK_nb + streaming_OPT_nb )
 daily_full_data_slices = []
 daily_full_data_slices_unixtime = []
 daily_full_data_slices_str_time = []
@@ -1568,8 +1505,6 @@ date_now = datetime.datetime.now(tz)
 triggerVolatilityMessage_window = 5  # Time window used to check volatility in all STK
 triggerVolatilityMessage_window_tr = triggerVolatilityMessage_window * 60 / Delay_PROCESS_DATA_UPDATE  # in number of price refresh itertions at current update frequency
 triggerVolatilityMessage_window_CTN = 0
-# triggerVolatilityMessage_volTreshold = 0.0035  # 0.35% of volatility variation
-# triggerVolatilityMessage_volTreshold = 0.0025  # 0.25% of volatility variation
 triggerVolatilityMessage_volTreshold = 0.004  # 0.40% of volatility variation
 
 # Variable in Update historic prices at each time "flag_doProcess == 1"
@@ -1591,30 +1526,7 @@ PathCurrent = os.getcwd()
 # change current working path to 'data' folder
 os.chdir('/Users/manu/Documents/code/TG_project/TG_base/data')
 
-# if os.path.isfile('GENESIS_DataHistory.db'):
-#     print('\n[ok] GENESIS_DataHistory.db exist in data folder.\n')
-# else:
-#     print('\n[create] GENESIS_DataHistory.db in data folder...\n')
-#     fcn_HistoricData_create_Sqlite_db()
 
-# GEN_OptionInfos_df_exist = False
-# # load specific option infprmations to continue price update
-# if os.path.isfile('GEN_OptionInfos_df.pkl'):
-#     print('\n[ok] GEN_OptionInfos_df exist in data folder.\n')
-#     #Load file infos in df
-#     CurrentOptionInfos_df = pd.read_pickle('GEN_OptionInfos_df.pkl')
-#     GEN_OptionInfos_df_exist = True
-# else:
-#     print('\n[warning] GEN_OptionInfos_df DO NOT exist in data folder.\n')
-#     fcn_HistoricData_create_Sqlite_db()
-
-# CurrentOptionInfos_df = pd.read_pickle('GEN_OptionInfos_df.pkl'
-# #/home/manu/Documents/2009___GENESIS/IB/Code/data/GEN_OptionInfos_df.pkl
-
-# #################################
-#     ATR : UPDATE ALL STOCKS VALUES
-# #################################
-# fcn_ATR_update_All(ATR_nbDays_w)
 
 # At start-up activate Market Data Streaming process
 # #################################
@@ -1658,11 +1570,10 @@ time.sleep(3)
 #######################################################################################
 #           Filter stock that are correctly streamed and keep this list in a separate variable
 #######################################################################################
-# if state_isNYSE_open == True:
 
 #check all sSTK with non zero values ---. ther are updating!!! We want to save them at the end of the day
-data_2save_STK_list = []
-data_2save_STK_list_idx = []
+data_active_tickers_list = []
+data_active_tickers_list_idx = []
 data_2save_OPT_list = []
 data_2save_OPT_list_idx = []
 
@@ -1671,16 +1582,17 @@ for i in range(0,len(stock_symbols_list)):
     if streaming_STK_OPT_TRADE[i,0] != 0 and streaming_STK_OPT_TRADE[i,1] != 0 and streaming_STK_OPT_TRADE[i,3] != 0 :
 
         # Add ticker to header list
-        data_2save_STK_list.append(stock_symbols_list[i])
+        data_active_tickers_list.append(stock_symbols_list[i])
         # Add ticker index to know the proper row to query in the futur
-        data_2save_STK_list_idx.append(i)
+        data_active_tickers_list_idx.append(i)
 
-for j in range(streaming_STK_nb, streaming_STK_nb + streaming_OPT_nb + TRADE_nbMAX_slots):
+for j in range(streaming_STK_nb, streaming_STK_nb + streaming_OPT_nb ):
     meta = streaming_instrument_metadata[j]
     if meta is None:
         continue
     if meta.get("type", "").startswith("OPT"):
-        if streaming_STK_OPT_TRADE[j,0] != 0 and streaming_STK_OPT_TRADE[j,1] != 0:
+        # if streaming_STK_OPT_TRADE[j,0] != 0 and streaming_STK_OPT_TRADE[j,1] != 0:
+        if data_active_tickers_list[j,0] != 0:
             opt_label = meta.get("label")
             if not opt_label:
                 strike = meta.get("strike")
@@ -1689,18 +1601,15 @@ for j in range(streaming_STK_nb, streaming_STK_nb + streaming_OPT_nb + TRADE_nbM
                 except (TypeError, ValueError):
                     strike_str = str(strike)
                 opt_label = f"OPT_{meta.get('right', 'U')}_{meta.get('symbol', 'UNK')}_{strike_str}"
-            data_2save_OPT_list.append(opt_label)
-            data_2save_OPT_list_idx.append(j)
+            data_active_tickers_list.append(opt_label)
+            data_active_tickers_list_idx.append(j)
 
-logger.info('data_2save_STK_list')
-logger.info(data_2save_STK_list)
+logger.info('data_active_tickers_list')
+logger.info(data_active_tickers_list)
 logger.info(' ')
-logger.info('data_2save_STK_list_idx')
-logger.info(data_2save_STK_list_idx)
-logger.info('data_2save_OPT_list')
-logger.info(data_2save_OPT_list)
-logger.info('data_2save_OPT_list_idx')
-logger.info(data_2save_OPT_list_idx)
+logger.info('data_active_tickers_list_idx')
+logger.info(data_active_tickers_list_idx)
+
 
 
 
@@ -1752,21 +1661,21 @@ while(1):  #MAIN LOOP
 
 
         # Data col srtructure : [ latestPrice, Bid, Ask, Vol, Bid_size, Ask_size]
-        curr_dataSlice = streaming_STK_OPT_TRADE[data_2save_STK_list_idx,:]
+        curr_dataSlice = streaming_STK_OPT_TRADE[data_active_tickers_list_idx,:]
 
         # Reset accumulation of bid and ask size values
         streaming_STK_OPT_TRADE[:,[4,5]] = 0.0
 
-        print(data_2save_STK_list)
+        print(data_active_tickers_list)
         print(curr_dataSlice)
         daily_full_data_slices.append(curr_dataSlice)
 
         # Save in a file talest data (overwrite file at each iterations)
         # Create the DataFrame from numpy array
-        curr_dataSlice_df = pd.DataFrame(np.array(curr_dataSlice), columns=[ 'latestPrice', 'Bid', 'Ask', 'Vol', 'Bid_size', 'Ask_size'], index=data_2save_STK_list)
+        curr_dataSlice_df = pd.DataFrame(np.array(curr_dataSlice), columns=[ 'latestPrice', 'Bid', 'Ask', 'Vol', 'Bid_size', 'Ask_size'], index=data_active_tickers_list)
 
         #Add stockName in df
-        curr_dataSlice_df['stk_name'] = data_2save_STK_list
+        curr_dataSlice_df['stk_name'] = data_active_tickers_list
         curr_dataSlice_df['ts_unix'] = timeStamp_unix
         #Save file
         print(' ')
@@ -1806,7 +1715,7 @@ while(1):  #MAIN LOOP
                      daily_full_data_3d = daily_full_data_slices_stacked_3d,
                      unixTime = np.array(daily_full_data_slices_unixtime),
                      strTime = np.array(daily_full_data_slices_str_time),
-                     tickerNames = np.array(data_2save_STK_list) )
+                     tickerNames = np.array(data_active_tickers_list) )
 
             logger.info('saving test .npz... done!')
 
@@ -1855,8 +1764,8 @@ while(1):  #MAIN LOOP
         # ---------------------------------------------- Init data for later save ----------------------------------------------
 
         #check all sSTK with non zero values ---. ther are updating!!! We want to save them at the end of the day
-        data_2save_STK_list = []
-        data_2save_STK_list_idx = []
+        data_active_tickers_list = []
+        data_active_tickers_list_idx = []
 
         for i in range(0,len(stock_symbols_list)):
 
@@ -1864,17 +1773,17 @@ while(1):  #MAIN LOOP
             # if streaming_STK_OPT_TRADE[i,0] != 0 and streaming_STK_OPT_TRADE[i,1] != 0 and streaming_STK_OPT_TRADE[i,3] != 0 : #Save only specific tickers (to save on DynamoDB access...)
 
                 # Add ticker to header list
-                data_2save_STK_list.append(stock_symbols_list[i])
+                data_active_tickers_list.append(stock_symbols_list[i])
                 # Add ticker index to know the proper row to query in the futur
-                data_2save_STK_list_idx.append(i)
+                data_active_tickers_list_idx.append(i)
 
         print(' ')
         print(' ---------------------------------------------- Morning sequence----------------------------------------------')
-        print('data_2save_STK_list')
-        print(data_2save_STK_list)
+        print('data_active_tickers_list')
+        print(data_active_tickers_list)
         print(' ')
-        print('data_2save_STK_list_idx')
-        print(data_2save_STK_list_idx)
+        print('data_active_tickers_list_idx')
+        print(data_active_tickers_list_idx)
 
 
 
@@ -1909,8 +1818,8 @@ while(1):  #MAIN LOOP
             print(np.array(daily_full_data_slices_unixtime))
             print(np.array('daily_full_data_slices_str_time'))
             print(np.array(daily_full_data_slices_str_time))
-            print(np.array('data_2save_STK_list') )
-            print(np.array(data_2save_STK_list) )
+            print(np.array('data_active_tickers_list') )
+            print(np.array(data_active_tickers_list) )
             print(' ')
 
             # saving
@@ -1919,7 +1828,7 @@ while(1):  #MAIN LOOP
                      daily_full_data_3d = daily_full_data_slices_stacked_3d,
                      unixTime = np.array(daily_full_data_slices_unixtime),
                      strTime = np.array(daily_full_data_slices_str_time),
-                     tickerNames = np.array(data_2save_STK_list) )
+                     tickerNames = np.array(data_active_tickers_list) )
 
             print('saving... done!')
 
@@ -1948,3 +1857,8 @@ while(1):  #MAIN LOOP
 
     #Main loop sleep delay
     time.sleep(0.25)
+
+
+# for i in range(0,500):
+#     app.cancelMktData(i)
+#     time.sleep(1.0)
