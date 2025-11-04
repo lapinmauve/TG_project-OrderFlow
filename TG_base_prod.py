@@ -1586,23 +1586,49 @@ for i in range(0,len(stock_symbols_list)):
         # Add ticker index to know the proper row to query in the futur
         data_active_tickers_list_idx.append(i)
 
-for j in range(streaming_STK_nb, streaming_STK_nb + streaming_OPT_nb ):
+for j in range(streaming_STK_nb, streaming_STK_nb + streaming_OPT_nb):
     meta = streaming_instrument_metadata[j]
-    if meta is None:
+    if not meta:
         continue
-    if meta.get("type", "").startswith("OPT"):
-        # if streaming_STK_OPT_TRADE[j,0] != 0 and streaming_STK_OPT_TRADE[j,1] != 0:
-        if streaming_STK_OPT_TRADE[j,0] != 0:
-            opt_label = meta.get("label")
-            if not opt_label:
-                strike = meta.get("strike")
-                try:
-                    strike_str = f"{float(strike):.2f}" if strike is not None else "NA"
-                except (TypeError, ValueError):
-                    strike_str = str(strike)
-                opt_label = f"OPT_{meta.get('right', 'U')}_{meta.get('symbol', 'UNK')}_{strike_str}"
-            data_active_tickers_list.append(opt_label)
-            data_active_tickers_list_idx.append(j)
+    if not str(meta.get("type", "")).startswith("OPT"):
+        continue
+
+    row_slice = streaming_STK_OPT_TRADE[j, :]
+    if np.allclose(row_slice[:3], 0.0):
+        continue
+
+    raw_label = meta.get("label")
+    strike_value = meta.get("strike")
+    try:
+        strike_float = float(strike_value)
+        if abs(strike_float - round(strike_float)) < 1e-6:
+            strike_token = str(int(round(strike_float)))
+        else:
+            strike_token = f"{strike_float:.2f}".rstrip("0").rstrip(".")
+    except (TypeError, ValueError):
+        strike_token = str(strike_value) if strike_value is not None else "NA"
+
+    symbol_token = meta.get("symbol", "UNK")
+    dte_token = "NA"
+    right_token = "CALL" if meta.get("right") == "C" else "PUT" if meta.get("right") == "P" else str(meta.get("right", "U")).upper()
+
+    if raw_label:
+        parts = raw_label.split("_")
+        if parts and parts[0] == "OPT":
+            if len(parts) >= 2:
+                symbol_token = parts[1]
+            if len(parts) >= 3:
+                dte_token = parts[2]
+            if len(parts) >= 4:
+                right_token = parts[3].upper()
+        elif len(parts) >= 3:
+            symbol_token = parts[0]
+            dte_token = parts[1]
+            right_token = parts[2].upper()
+
+    formatted_label = f"{symbol_token}_{dte_token}_{right_token}_{strike_token}"
+    data_active_tickers_list.append(formatted_label)
+    data_active_tickers_list_idx.append(j)
 
 logger.info('data_active_tickers_list')
 logger.info(data_active_tickers_list)
