@@ -26,8 +26,7 @@ class OptionRequest:
     symbol: str
     days_to_expiry: int
     right: str  # 'C' or 'P'
-    offset: Optional[float] = None
-    offset_kind: Optional[str] = None  # e.g. 'ATM', 'OTM', 'ITM', 'ABS'
+    offset: float
 
 
 def _build_option_contract(
@@ -83,7 +82,7 @@ def _find_free_rows(streaming_table: np.ndarray, start_index: int, count: int) -
 
 def parse_option_config_line(line: str) -> OptionRequest:
     parts = line.strip().split("_")
-    if len(parts) < 5 or parts[0] != "OPT":
+    if len(parts) not in (5, 6) or parts[0] != "OPT":
         raise ValueError(f"Invalid option configuration entry: {line}")
 
     symbol = parts[1].upper()
@@ -97,46 +96,33 @@ def parse_option_config_line(line: str) -> OptionRequest:
         raise ValueError(f"Invalid option right in entry: {line}")
     right = "C" if right_token == "CALL" else "P"
 
-    offset_kind: Optional[str] = None
-    offset_value: Optional[float] = None
-    numeric_token: Optional[str] = None
-
-    if len(parts) == 5:
-        tail_token = parts[4].upper()
-        if tail_token in {"ATM", "OTM", "ITM"}:
-            offset_kind = tail_token
-        else:
-            numeric_token = parts[4]
-    elif len(parts) >= 6:
+    offset_token_index = 4
+    if len(parts) == 6:
         base_token = parts[4].upper()
-        if base_token in {"ATM", "OTM", "ITM"}:
-            offset_kind = base_token
-            numeric_token = parts[5] if len(parts) >= 6 else None
-        else:
-            numeric_token = parts[4]
+        if base_token != "ATM":
+            raise ValueError(f"Unexpected base token '{base_token}' in entry: {line}")
+        offset_token_index = 5
+    elif len(parts) == 5 and parts[4].upper() == "ATM":
+        # Default ATM contract with zero offset
+        return OptionRequest(
+            label=line.strip(),
+            symbol=symbol,
+            days_to_expiry=days_to_expiry,
+            right=right,
+            offset=0.0,
+        )
 
-        if len(parts) > 6:
-            raise ValueError(f"Too many tokens in entry: {line}")
-    else:
-        raise ValueError(f"Unsupported option configuration entry: {line}")
-
-    if numeric_token is not None:
-        try:
-            offset_value = float(numeric_token)
-        except ValueError as exc:
-            raise ValueError(f"Invalid offset in entry: {line}") from exc
-        if offset_kind is None:
-            offset_kind = "ABS"
-    if offset_kind is None:
-        offset_kind = "ATM"
+    try:
+        offset = float(parts[offset_token_index])
+    except ValueError:
+        raise ValueError(f"Invalid offset in entry: {line}")
 
     return OptionRequest(
         label=line.strip(),
         symbol=symbol,
         days_to_expiry=days_to_expiry,
         right=right,
-        offset=offset_value,
-        offset_kind=offset_kind,
+        offset=offset,
     )
 
 
@@ -161,7 +147,6 @@ def prepare_option_contracts(
     price_timeout: float = 10.0,
     price_poll_interval: float = 0.5,
     strike_steps: Optional[Dict[str, float]] = None,
-    otm_offsets: Optional[Dict[str, float]] = None,
     trading_classes: Optional[Dict[str, str]] = None,
 ) -> List[dict]:
     """
@@ -170,7 +155,6 @@ def prepare_option_contracts(
     Returns metadata entries ready to feed into streaming.
     """
     strike_steps = strike_steps or {}
-    otm_offsets = otm_offsets or {}
     trading_classes = trading_classes or {}
 
     if not option_requests:
@@ -221,23 +205,7 @@ def prepare_option_contracts(
         step = strike_steps.get(request.symbol, 1.0)
         atm_strike = round(round(underlying_price / step) * step, 2)
 
-        # Determine the offset to apply relative to ATM
-        if request.offset is not None:
-            applied_offset = request.offset
-        else:
-            magnitude = otm_offsets.get(request.symbol)
-            if magnitude is None:
-                magnitude = step
-            if request.offset_kind == "OTM":
-                direction = 1.0 if request.right == "C" else -1.0
-                applied_offset = direction * magnitude
-            elif request.offset_kind == "ITM":
-                direction = -1.0 if request.right == "C" else 1.0
-                applied_offset = direction * magnitude
-            else:
-                applied_offset = 0.0
-
-        raw_strike = atm_strike + applied_offset
+        raw_strike = atm_strike + request.offset
         strike = round(round(raw_strike / step) * step, 2)
 
         trading_class = trading_classes.get(request.symbol)
@@ -250,11 +218,10 @@ def prepare_option_contracts(
         )
 
         logger.debug(
-            "Configured contract {} -> strike {:.2f} (offset {} kind {}), expiry {}, tradingClass={}, req row {}",
+            "Configured contract {} -> strike {:.2f} (offset {}), expiry {}, tradingClass={}, req row {}",
             request.label,
             strike,
-            applied_offset,
-            request.offset_kind,
+            request.offset,
             expiry_str,
             trading_class,
             row_index,
@@ -278,8 +245,6 @@ def prepare_option_contracts(
                 "right": request.right,
                 "contract": contract,
                 "type": "OPT_CFG",
-                "offset_kind": request.offset_kind,
-                "offset": applied_offset,
             }
         )
 

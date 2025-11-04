@@ -1586,28 +1586,23 @@ for i in range(0,len(stock_symbols_list)):
         # Add ticker index to know the proper row to query in the futur
         data_active_tickers_list_idx.append(i)
 
-for j in range(streaming_STK_nb, streaming_STK_nb + streaming_OPT_nb):
+for j in range(streaming_STK_nb, streaming_STK_nb + streaming_OPT_nb ):
     meta = streaming_instrument_metadata[j]
-    if not meta:
+    if meta is None:
         continue
-    if not str(meta.get("type", "")).startswith("OPT"):
-        continue
-
-    row_slice = streaming_STK_OPT_TRADE[j, :]
-    if np.allclose(row_slice[:3], 0.0):
-        continue
-
-    opt_label = meta.get("label")
-    if not opt_label:
-        strike = meta.get("strike")
-        try:
-            strike_str = f"{float(strike):.2f}" if strike is not None else "NA"
-        except (TypeError, ValueError):
-            strike_str = str(strike)
-        opt_label = f"OPT_{meta.get('right', 'U')}_{meta.get('symbol', 'UNK')}_{strike_str}"
-
-    data_active_tickers_list.append(opt_label)
-    data_active_tickers_list_idx.append(j)
+    if meta.get("type", "").startswith("OPT"):
+        # if streaming_STK_OPT_TRADE[j,0] != 0 and streaming_STK_OPT_TRADE[j,1] != 0:
+        if data_active_tickers_list[j,0] != 0:
+            opt_label = meta.get("label")
+            if not opt_label:
+                strike = meta.get("strike")
+                try:
+                    strike_str = f"{float(strike):.2f}" if strike is not None else "NA"
+                except (TypeError, ValueError):
+                    strike_str = str(strike)
+                opt_label = f"OPT_{meta.get('right', 'U')}_{meta.get('symbol', 'UNK')}_{strike_str}"
+            data_active_tickers_list.append(opt_label)
+            data_active_tickers_list_idx.append(j)
 
 logger.info('data_active_tickers_list')
 logger.info(data_active_tickers_list)
